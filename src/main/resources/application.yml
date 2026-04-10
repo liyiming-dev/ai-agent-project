@@ -1,8 +1,14 @@
 spring:
   application:
     name: yu-ai-code-mother-backend
+  # mysql
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306/ai_agent_project
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: 1234
 server:
-  port: 8120
+  port: 8123
   servlet:
     context-path: /api
 
