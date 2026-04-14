@@ -1,6 +1,6 @@
 package com.yiming.aiagentproject.controller;
 
-import annotation.AuthCheck;
+import com.yiming.aiagentproject.annotation.AuthCheck;
 import cn.hutool.core.bean.BeanUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.yiming.aiagentproject.common.BaseResponse;
@@ -45,10 +45,10 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public BaseResponse<LoginUserVO> userLogin(@RequestBody UserLoginRequest userLoginRequest, HttpServletRequest request) {
-        ThrowUtils.throwIf(userLoginRequest == null, ErrorCode.PARAMS_ERROR);
-        String userAccount = userLoginRequest.getUserAccount();
-        String userPassword = userLoginRequest.getUserPassword();
+    public BaseResponse<LoginUserVO> userLogin(@RequestBody UserLoginDto userLoginDto, HttpServletRequest request) {
+        ThrowUtils.throwIf(userLoginDto == null, ErrorCode.PARAMS_ERROR);
+        String userAccount = userLoginDto.getUserAccount();
+        String userPassword = userLoginDto.getUserPassword();
         LoginUserVO loginUserVO = userService.userLogin(userAccount, userPassword, request);
         return ResultUtils.success(loginUserVO);
     }
@@ -71,10 +71,10 @@ public class UserController {
      */
     @PostMapping("/add")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Long> addUser(@RequestBody UserAddRequest userAddRequest) {
-        ThrowUtils.throwIf(userAddRequest == null, ErrorCode.PARAMS_ERROR);
+    public BaseResponse<Long> addUser(@RequestBody UserAddDto userAddDto) {
+        ThrowUtils.throwIf(userAddDto == null, ErrorCode.PARAMS_ERROR);
         User user = new User();
-        BeanUtil.copyProperties(userAddRequest, user);
+        BeanUtil.copyProperties(userAddDto, user);
         // 默认密码 12345678
         final String DEFAULT_PASSWORD = "12345678";
         String encryptPassword = userService.getEncryptPassword(DEFAULT_PASSWORD);
@@ -124,12 +124,12 @@ public class UserController {
      */
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest) {
-        if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
+    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateDto userUpdateDto) {
+        if (userUpdateDto == null || userUpdateDto.getId() == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         User user = new User();
-        BeanUtil.copyProperties(userUpdateRequest, user);
+        BeanUtil.copyProperties(userUpdateDto, user);
         boolean result = userService.updateById(user);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
@@ -142,12 +142,12 @@ public class UserController {
      */
     @PostMapping("/list/page/vo")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest) {
-        ThrowUtils.throwIf(userQueryRequest == null, ErrorCode.PARAMS_ERROR);
-        long pageNum = userQueryRequest.getPageNum();
-        long pageSize = userQueryRequest.getPageSize();
+    public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryDto userQueryDto) {
+        ThrowUtils.throwIf(userQueryDto == null, ErrorCode.PARAMS_ERROR);
+        long pageNum = userQueryDto.getPageNum();
+        long pageSize = userQueryDto.getPageSize();
         Page<User> userPage = userService.page(Page.of(pageNum, pageSize),
-                userService.getQueryWrapper(userQueryRequest));
+                userService.getQueryWrapper(userQueryDto));
         // 数据脱敏
         Page<UserVO> userVOPage = new Page<>(pageNum, pageSize, userPage.getTotalRow());
         List<UserVO> userVOList = userService.getUserVOList(userPage.getRecords());

@@ -1,6 +1,6 @@
 package com.yiming.aiagentproject.aop;
 
-import annotation.AuthCheck;
+import com.yiming.aiagentproject.annotation.AuthCheck;
 import com.yiming.aiagentproject.enums.UserRoleEnum;
 import com.yiming.aiagentproject.exception.BusinessException;
 import com.yiming.aiagentproject.exception.ErrorCode;

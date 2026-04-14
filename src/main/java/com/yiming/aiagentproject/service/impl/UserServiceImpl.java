@@ -5,7 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
-import com.yiming.aiagentproject.dto.UserQueryRequest;
+import com.yiming.aiagentproject.dto.UserQueryDto;
 import com.yiming.aiagentproject.enums.UserRoleEnum;
 import com.yiming.aiagentproject.exception.BusinessException;
 import com.yiming.aiagentproject.exception.ErrorCode;
@@ -169,17 +169,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User>  implements U
 
 //将查询请求转化为QueryWrapper对象
     @Override
-    public QueryWrapper getQueryWrapper(UserQueryRequest userQueryRequest) {
-        if (userQueryRequest == null) {
+    public QueryWrapper getQueryWrapper(UserQueryDto userQueryDto) {
+        if (userQueryDto == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "请求参数为空");
         }
-        Long id = userQueryRequest.getId();
-        String userAccount = userQueryRequest.getUserAccount();
-        String userName = userQueryRequest.getUserName();
-        String userProfile = userQueryRequest.getUserProfile();
-        String userRole = userQueryRequest.getUserRole();
-        String sortField = userQueryRequest.getSortField();
-        String sortOrder = userQueryRequest.getSortOrder();
+        Long id = userQueryDto.getId();
+        String userAccount = userQueryDto.getUserAccount();
+        String userName = userQueryDto.getUserName();
+        String userProfile = userQueryDto.getUserProfile();
+        String userRole = userQueryDto.getUserRole();
+        String sortField = userQueryDto.getSortField();
+        String sortOrder = userQueryDto.getSortOrder();
         return QueryWrapper.create()
                 .eq("id", id)
                 .eq("userRole", userRole)

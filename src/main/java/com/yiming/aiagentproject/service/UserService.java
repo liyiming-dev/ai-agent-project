@@ -2,7 +2,7 @@ package com.yiming.aiagentproject.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
-import com.yiming.aiagentproject.dto.UserQueryRequest;
+import com.yiming.aiagentproject.dto.UserQueryDto;
 import com.yiming.aiagentproject.model.entity.User;
 import com.yiming.aiagentproject.vo.LoginUserVO;
 import com.yiming.aiagentproject.vo.UserVO;
@@ -54,5 +54,5 @@ public interface UserService extends IService<User> {
 
     List<UserVO> getUserVOList(List<User> userList);
 
-    QueryWrapper getQueryWrapper(UserQueryRequest userQueryRequest);
+    QueryWrapper getQueryWrapper(UserQueryDto userQueryDto);
 }

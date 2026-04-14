@@ -31,3 +31,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### custom ###
+application-local
+tmp

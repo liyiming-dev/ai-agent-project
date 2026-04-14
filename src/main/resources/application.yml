@@ -1,6 +1,9 @@
 spring:
   application:
     name: yu-ai-code-mother-backend
+  profiles:
+    active: local
+
   # mysql
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/ai_agent_project

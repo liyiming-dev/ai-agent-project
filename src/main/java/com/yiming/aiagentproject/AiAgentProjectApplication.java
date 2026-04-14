@@ -9,6 +9,7 @@ import org.springframework.context.annotation.EnableAspectJAutoProxy;
 
 @MapperScan("com.yiming.aiagentproject.mapper")
 @EnableAspectJAutoProxy
+
 public class AiAgentProjectApplication {
 
     public static void main(String[] args) {
