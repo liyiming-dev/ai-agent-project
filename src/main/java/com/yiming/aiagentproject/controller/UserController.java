@@ -7,7 +7,7 @@ import com.yiming.aiagentproject.common.BaseResponse;
 import com.yiming.aiagentproject.common.DeleteRequest;
 import com.yiming.aiagentproject.common.ResultUtils;
 import com.yiming.aiagentproject.constant.UserConstant;
-import com.yiming.aiagentproject.dto.*;
+import com.yiming.aiagentproject.dto.user.*;
 import com.yiming.aiagentproject.exception.BusinessException;
 import com.yiming.aiagentproject.exception.ErrorCode;
 import com.yiming.aiagentproject.exception.ThrowUtils;

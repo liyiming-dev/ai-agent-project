@@ -2,7 +2,7 @@ package com.yiming.aiagentproject.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
-import com.yiming.aiagentproject.dto.UserQueryDto;
+import com.yiming.aiagentproject.dto.user.UserQueryDto;
 import com.yiming.aiagentproject.model.entity.User;
 import com.yiming.aiagentproject.vo.LoginUserVO;
 import com.yiming.aiagentproject.vo.UserVO;

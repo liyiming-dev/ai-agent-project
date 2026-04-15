@@ -1,14 +1,11 @@
-package com.yiming.aiagentproject.dto;
+package com.yiming.aiagentproject.dto.user;
 
-import com.yiming.aiagentproject.common.PageRequest;
 import lombok.Data;
-import lombok.EqualsAndHashCode;
 
 import java.io.Serializable;
 
-@EqualsAndHashCode(callSuper = true)
 @Data
-public class UserQueryDto extends PageRequest implements Serializable {
+public class UserUpdateDto implements Serializable {
 
     /**
      * id
@@ -21,9 +18,9 @@ public class UserQueryDto extends PageRequest implements Serializable {
     private String userName;
 
     /**
-     * 账号
+     * 用户头像
      */
-    private String userAccount;
+    private String userAvatar;
 
     /**
      * 简介
@@ -31,7 +28,7 @@ public class UserQueryDto extends PageRequest implements Serializable {
     private String userProfile;
 
     /**
-     * 用户角色：user/admin/ban
+     * 用户角色：user/admin
      */
     private String userRole;
 

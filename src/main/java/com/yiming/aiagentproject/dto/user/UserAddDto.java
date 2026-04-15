@@ -1,4 +1,4 @@
-package com.yiming.aiagentproject.dto;
+package com.yiming.aiagentproject.dto.user;
 
 import lombok.Data;
 

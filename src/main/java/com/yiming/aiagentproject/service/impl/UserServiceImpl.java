@@ -5,7 +5,7 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
-import com.yiming.aiagentproject.dto.UserQueryDto;
+import com.yiming.aiagentproject.dto.user.UserQueryDto;
 import com.yiming.aiagentproject.enums.UserRoleEnum;
 import com.yiming.aiagentproject.exception.BusinessException;
 import com.yiming.aiagentproject.exception.ErrorCode;
