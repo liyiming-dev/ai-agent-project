@@ -1,18 +1,18 @@
 package com.yiming.aiagentproject.controller;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.util.StrUtil;
+import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.annotation.AuthCheck;
 import com.yiming.aiagentproject.common.BaseResponse;
 import com.yiming.aiagentproject.common.DeleteRequest;
 import com.yiming.aiagentproject.common.ResultUtils;
 import com.yiming.aiagentproject.constant.AppConstant;
 import com.yiming.aiagentproject.constant.UserConstant;
-import com.yiming.aiagentproject.dto.app.AppAddDto;
-import com.yiming.aiagentproject.dto.app.AppAdminUpdateDto;
-import com.yiming.aiagentproject.dto.app.AppQueryDto;
-import com.yiming.aiagentproject.dto.app.AppUpdateDto;
+import com.yiming.aiagentproject.dto.app.*;
 import com.yiming.aiagentproject.exception.ErrorCode;
 import com.yiming.aiagentproject.exception.ThrowUtils;
 import com.yiming.aiagentproject.model.entity.App;
@@ -21,10 +21,16 @@ import com.yiming.aiagentproject.service.AppService;
 import com.yiming.aiagentproject.service.UserService;
 import com.yiming.aiagentproject.vo.AppVO;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
+import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 /**
  * 应用 控制层。
@@ -53,10 +59,12 @@ public class AppController {
         ThrowUtils.throwIf(initPrompt == null || initPrompt.isBlank(), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
         User loginUser = userService.getLoginUser(request);
         App app = new App();
-        app.setInitPrompt(initPrompt);
+        BeanUtils.copyProperties(appAddDto,app);
+
         app.setUserId(loginUser.getId());
         // 默认使用 initPrompt 前 12 个字作为应用名
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
+        app.setCodeGenType(CodeGenTypeEnum.MULTI_FILE.getValue());
         boolean result = appService.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(app.getId());
@@ -213,6 +221,61 @@ public class AppController {
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR);
         return ResultUtils.success(appService.getAppVO(app));
     }
+
+    /**
+     * 应用聊天生成代码（流式 SSE）
+     *
+     * @param appId   应用 ID
+     * @param message 用户消息
+     * @param request 请求对象
+     * @return 生成结果流
+     */
+    @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
+                                                       @RequestParam String message,
+                                                       HttpServletRequest request) {
+        // 参数校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
+        ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        // 调用服务生成代码（流式）
+        Flux<String> stringFlux = appService.chatToGenCode(appId, message, loginUser);
+        return stringFlux.map(chunk -> {
+            Map<String, String> wrapper = Map.of("d", chunk);
+            String jsonData = JSONUtil.toJsonStr(wrapper);
+            return ServerSentEvent.<String>builder()
+                    .data(jsonData)
+                    .build();
+        }).concatWith(Mono.just(
+                //发送结束事件
+                ServerSentEvent.<String>builder()
+                        .event("done")
+                        .data("")
+                        .build()
+        ));
+    }
+
+    /**
+     * 应用部署
+     *
+     * @param appDeployDto 部署请求
+     * @param request          请求
+     * @return 部署 URL
+     */
+    @PostMapping("/deploy")
+    public BaseResponse<String> deployApp(@RequestBody AppDeployDto appDeployDto, HttpServletRequest request) {
+        ThrowUtils.throwIf(appDeployDto == null, ErrorCode.PARAMS_ERROR);
+        Long appId = appDeployDto.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        // 获取当前登录用户
+        User loginUser = userService.getLoginUser(request);
+        // 调用服务部署应用
+        String deployUrl = appService.deployApp(appId, loginUser);
+        return ResultUtils.success(deployUrl);
+    }
+
+
 
     // endregion
 }

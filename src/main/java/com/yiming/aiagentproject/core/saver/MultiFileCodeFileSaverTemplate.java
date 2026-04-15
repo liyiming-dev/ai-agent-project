@@ -7,16 +7,13 @@ public class MultiFileCodeFileSaverTemplate extends CodeFileSaverTemplate<MultiF
     @Override
     protected void saveFiles(MultiFileCodeResult result, String baseDirPath) {
         //保存HTML文件
-        String htmlFilePath = baseDirPath + "/index.html";
-        writeToFile(htmlFilePath, "index.html", result.getHtmlCode());
+        writeToFile(baseDirPath, "index.html", result.getHtmlCode());
 
         //保存CSS文件
-        String cssFilePath = baseDirPath + "/style.css";
-        writeToFile(cssFilePath, "style.css", result.getCssCode());
+        writeToFile(baseDirPath, "style.css", result.getCssCode());
 
         //保存JS文件
-        String jsFilePath = baseDirPath + "/script.js";
-        writeToFile(jsFilePath, "script.js", result.getJsCode());
+        writeToFile(baseDirPath, "script.js", result.getJsCode());
     }
 
     @Override
