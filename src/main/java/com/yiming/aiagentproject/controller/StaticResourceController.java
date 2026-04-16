@@ -16,17 +16,19 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 
 import static com.yiming.aiagentproject.constant.AppConstant.CODE_DEPLOY_ROOT_DIR;
+import static com.yiming.aiagentproject.constant.AppConstant.CODE_OUTPUT_ROOT_DIR;
 
 @RestController
 @RequestMapping("/static")
 public class StaticResourceController {
 
-    // 应用部署根目录（用于浏览）
-    private static final String PREVIEW_ROOT_DIR = CODE_DEPLOY_ROOT_DIR;
+    // 候选根目录：优先查生成目录（对话页预览），其次查部署目录（部署后访问）
+    private static final String[] PREVIEW_ROOT_DIRS = {CODE_OUTPUT_ROOT_DIR, CODE_DEPLOY_ROOT_DIR};
 
     /**
      * 提供静态资源访问，支持目录重定向
      * 访问格式：http://localhost:8123/api/static/{deployKey}[/{fileName}]
+     * 其中 deployKey 可以是生成目录名（{codeGenType}_{appId}）或部署目录名（随机码）
      */
     @GetMapping("/{deployKey}/**")
     public ResponseEntity<Resource> serveStaticResource(
@@ -52,17 +54,23 @@ public class StaticResourceController {
             if (resourcePath.equals("/")) {
                 resourcePath = "/index.html";
             }
-            // 构建文件路径
-            String filePath = PREVIEW_ROOT_DIR + "/" + deployKey + resourcePath;
-            File file = new File(filePath);
+            // 依次在候选根目录中查找文件
+            File file = null;
+            for (String rootDir : PREVIEW_ROOT_DIRS) {
+                File candidate = new File(rootDir + "/" + deployKey + resourcePath);
+                if (candidate.exists() && candidate.isFile()) {
+                    file = candidate;
+                    break;
+                }
+            }
             // 检查文件是否存在
-            if (!file.exists()) {
+            if (file == null) {
                 return ResponseEntity.notFound().build();
             }
             // 返回文件资源
             Resource resource = new FileSystemResource(file);
             return ResponseEntity.ok()
-                    .header("Content-Type", getContentTypeWithCharset(filePath))
+                    .header("Content-Type", getContentTypeWithCharset(file.getName()))
                     .body(resource);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
