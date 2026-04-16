@@ -127,12 +127,14 @@ public class AppController {
         ThrowUtils.throwIf(appQueryDto == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(appQueryDto.getPageSize() > 20, ErrorCode.PARAMS_ERROR, "每页最多 20 个");
         User loginUser = userService.getLoginUser(request);
-        // 仅查询自己的，只允许按名称过滤
+        // 仅查询自己的，只允许按名称过滤，按创建时间倒序
         AppQueryDto safeQuery = new AppQueryDto();
         safeQuery.setAppName(appQueryDto.getAppName());
         safeQuery.setUserId(loginUser.getId());
         safeQuery.setPageNum(appQueryDto.getPageNum());
         safeQuery.setPageSize(appQueryDto.getPageSize());
+        safeQuery.setSortField("createTime");
+        safeQuery.setSortOrder("descend");
         long pageNum = safeQuery.getPageNum();
         long pageSize = safeQuery.getPageSize();
         Page<App> appPage = appService.page(Page.of(pageNum, pageSize), appService.getQueryWrapper(safeQuery));
@@ -150,11 +152,11 @@ public class AppController {
         ThrowUtils.throwIf(appQueryDto.getPageSize() > 20, ErrorCode.PARAMS_ERROR, "每页最多 20 个");
         long pageNum = appQueryDto.getPageNum();
         long pageSize = appQueryDto.getPageSize();
-        // 精选：优先级 >= 99，按优先级降序
+        // 精选：优先级 >= 99，按创建时间倒序
         QueryWrapper queryWrapper = QueryWrapper.create()
                 .like("appName", appQueryDto.getAppName())
                 .ge("priority", AppConstant.GOOD_APP_PRIORITY)
-                .orderBy("priority", false);
+                .orderBy("createTime", false);
         Page<App> appPage = appService.page(Page.of(pageNum, pageSize), queryWrapper);
         Page<AppVO> appVOPage = new Page<>(pageNum, pageSize, appPage.getTotalRow());
         appVOPage.setRecords(appService.getAppVOList(appPage.getRecords()));
