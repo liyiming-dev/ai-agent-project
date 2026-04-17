@@ -1,85 +1,87 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
 :root {
-  /* ── Brand Blue Palette ── */
-  --blue-950: #020B1A;
-  --blue-900: #041029;
-  --blue-800: #071F52;
-  --blue-700: #0A3280;
-  --blue-600: #0052CC;
-  --blue-500: #0066FF;
-  --blue-400: #3385FF;
-  --blue-300: #66A3FF;
-  --blue-200: #B3CFFF;
-  --blue-100: #D6E8FF;
-  --blue-50:  #EBF3FF;
+  /* ── Warm Base ── */
+  --cream-50:  #FCFAF5;
+  --cream-100: #F7F3ED;
+  --cream-200: #EFEADF;
+  --cream-300: #E7DFCD;
 
-  /* ── Accent Purple ── */
-  --purple-600: #6B21A8;
-  --purple-500: #7C3AED;
-  --purple-400: #8B5CF6;
-  --purple-300: #A78BFA;
-  --purple-100: #EDE9FE;
-  --purple-50:  #F5F3FF;
+  /* ── Brand Blue (desaturated) ── */
+  --blue-950: #08122B;
+  --blue-900: #0E1B4A;
+  --blue-800: #17296D;
+  --blue-700: #1F40B8;
+  --blue-600: #2B5CE6;
+  --blue-500: #2B5CE6;
+  --blue-400: #5A7FEE;
+  --blue-300: #8FA8F4;
+  --blue-200: #C4D1FA;
+  --blue-100: #DDE5FC;
+  --blue-50:  #E5ECFB;
 
-  /* ── Neutral Ink ── */
-  --ink-900: #111827;
-  --ink-800: #1F2937;
-  --ink-700: #374151;
-  --ink-600: #4B5563;
-  --ink-500: #6B7280;
-  --ink-400: #9CA3AF;
-  --ink-300: #D1D5DB;
-  --ink-200: #E5E7EB;
-  --ink-100: #F3F4F6;
-  --ink-50:  #F9FAFB;
+  /* ── Accent Terracotta (signature) ── */
+  --hot-800: #8A2C06;
+  --hot-700: #A23509;
+  --hot-600: #C2410C;
+  --hot-500: #D97757;
+  --hot-400: #E69C7F;
+  --hot-300: #F0BDA6;
+  --hot-200: #F4D9C7;
+  --hot-100: #F9E8DC;
+  --hot-50:  #FBF1E9;
 
-  /* ── Surface Colors ── */
+  /* ── Neutral Ink (warm) ── */
+  --ink-900: #1C1A17;
+  --ink-800: #2B2822;
+  --ink-700: #3E3A33;
+  --ink-600: #524B41;
+  --ink-500: #7A7167;
+  --ink-400: #A59C90;
+  --ink-300: #C3BAAD;
+  --ink-200: #D9D1C2;
+  --ink-100: #E7DFCD;
+  --ink-50:  #F1EBDE;
+
+  /* ── Surface ── */
   --surface-base: #FFFFFF;
   --surface-soft: rgba(255, 255, 255, 0.85);
-  --surface-glass: rgba(255, 255, 255, 0.65);
+  --surface-cream: var(--cream-100);
 
-  /* ── Gradients ── */
-  --gradient-atmosphere:
-    radial-gradient(ellipse 70% 50% at 15% 5%, rgba(0, 102, 255, 0.07), transparent 60%),
-    radial-gradient(ellipse 55% 45% at 85% 10%, rgba(124, 58, 237, 0.06), transparent 55%),
-    radial-gradient(ellipse 60% 55% at 50% 115%, rgba(0, 102, 255, 0.05), transparent 65%),
-    linear-gradient(180deg, #FFFFFF 0%, #F4F7FF 60%, #EEF2FF 100%);
+  /* ── Gradients (used sparingly) ── */
+  --gradient-atmosphere: linear-gradient(180deg, var(--cream-50) 0%, var(--cream-100) 100%);
+  --gradient-primary:   linear-gradient(135deg, var(--ink-900) 0%, var(--ink-800) 100%);
+  --gradient-hot:       linear-gradient(135deg, #C2410C 0%, #D97757 100%);
+  --gradient-text:      linear-gradient(115deg, var(--hot-600) 0%, var(--hot-500) 100%);
+  --gradient-soft:      linear-gradient(135deg, rgba(194, 65, 12, 0.04), rgba(43, 92, 230, 0.02));
 
-  --gradient-primary:  linear-gradient(135deg, #0052CC 0%, #0066FF 50%, #3385FF 100%);
-  --gradient-accent:   linear-gradient(135deg, #0066FF 0%, #7C3AED 100%);
-  --gradient-text:     linear-gradient(115deg, #0052CC 0%, #0066FF 40%, #7C3AED 80%, #8B5CF6 100%);
-  --gradient-soft:     linear-gradient(135deg, rgba(0, 102, 255, 0.05), rgba(124, 58, 237, 0.02));
-  --gradient-hero-glow:
-    radial-gradient(ellipse 80% 60% at 50% 0%, rgba(0, 102, 255, 0.12), transparent 70%);
-
-  /* ── Shadows ── */
-  --shadow-xs:    0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  --shadow-sm:    0 4px 16px rgba(0, 82, 204, 0.08), 0 1px 4px rgba(0, 0, 0, 0.04);
-  --shadow-md:    0 10px 36px rgba(0, 82, 204, 0.10), 0 2px 8px rgba(0, 0, 0, 0.05);
-  --shadow-lg:    0 24px 60px rgba(0, 82, 204, 0.12), 0 4px 16px rgba(0, 0, 0, 0.06);
-  --shadow-input: 0 4px 24px rgba(0, 82, 204, 0.12), 0 1px 6px rgba(0, 0, 0, 0.05);
-  --shadow-card:  0 1px 3px rgba(0, 0, 0, 0.06), 0 8px 24px rgba(0, 82, 204, 0.06);
-  --shadow-card-hover: 0 2px 8px rgba(0, 0, 0, 0.08), 0 16px 48px rgba(0, 82, 204, 0.14);
-  --shadow-focus: 0 0 0 3px rgba(0, 102, 255, 0.20);
-  --shadow-glow:  0 12px 32px rgba(0, 102, 255, 0.28);
+  /* ── Shadows (neutral, barely there) ── */
+  --shadow-xs:    0 1px 2px rgba(28, 26, 23, 0.05);
+  --shadow-sm:    0 1px 3px rgba(28, 26, 23, 0.06), 0 2px 0 rgba(28, 26, 23, 0.03);
+  --shadow-md:    0 4px 12px rgba(28, 26, 23, 0.08);
+  --shadow-lg:    0 14px 30px rgba(28, 26, 23, 0.10);
+  --shadow-input: 0 2px 0 var(--ink-200);
+  --shadow-input-focus: 0 4px 0 var(--ink-900);
+  --shadow-card:  0 1px 2px rgba(28, 26, 23, 0.05);
+  --shadow-card-hover: 0 10px 0 -4px var(--ink-200), 0 14px 30px rgba(28, 26, 23, 0.08);
+  --shadow-focus: 0 0 0 3px rgba(194, 65, 12, 0.18);
 
   /* ── Easings ── */
-  --ease-out-expo:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo:  cubic-bezier(0.22, 1, 0.36, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
   --ease-smooth:    cubic-bezier(0.65, 0, 0.35, 1);
 
   /* ── Typography ── */
-  --font-display: 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  --font-display: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'STSong', serif;
   --font-sans:    'Inter', 'PingFang SC', 'HarmonyOS Sans SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
   --font-mono:    'JetBrains Mono', 'Fira Code', Consolas, Monaco, monospace;
 
   /* ── Radii ── */
-  --radius-xs:   6px;
-  --radius-sm:   10px;
-  --radius-md:   14px;
-  --radius-lg:   20px;
-  --radius-xl:   28px;
+  --radius-xs:   4px;
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   20px;
   --radius-pill: 999px;
 }
 
@@ -110,117 +112,79 @@ body {
   isolation: isolate;
 }
 
-/* Subtle dot-grid overlay */
-body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-  background-image: radial-gradient(circle at 1px 1px, rgba(0, 102, 255, 0.055) 1px, transparent 0);
-  background-size: 28px 28px;
-  mask-image: radial-gradient(ellipse 90% 70% at 50% 35%, rgba(0, 0, 0, 0.45), transparent 85%);
-  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 35%, rgba(0, 0, 0, 0.45), transparent 85%);
-}
-
-/* Decorative top-right orb */
-body::after {
-  content: '';
-  position: fixed;
-  top: -200px;
-  right: -180px;
-  width: 600px;
-  height: 600px;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(124, 58, 237, 0.10) 0%, rgba(0, 102, 255, 0.05) 45%, transparent 70%);
-  filter: blur(8px);
-  pointer-events: none;
-  z-index: 0;
-  animation: floatOrb 24s ease-in-out infinite alternate;
-}
-
-@keyframes floatOrb {
-  0%   { transform: translate(0, 0) scale(1); }
-  100% { transform: translate(-70px, 90px) scale(1.12); }
-}
-
 a {
-  color: var(--blue-500);
+  color: var(--hot-600);
   text-decoration: none;
   transition: color 0.22s var(--ease-out-quart);
 }
 a:hover {
-  color: var(--blue-600);
+  color: var(--ink-900);
 }
 
 ::selection {
-  background: rgba(0, 102, 255, 0.15);
+  background: var(--hot-200);
   color: var(--ink-900);
 }
 
 /* ─────────────────────────────────────────────
-   Ant Design Overrides  (blue/purple palette)
+   Ant Design Overrides · Warm Tech
 ───────────────────────────────────────────── */
 
 /* Buttons */
 .ant-btn {
-  border-radius: 10px !important;
+  border-radius: 999px !important;
   font-family: var(--font-sans) !important;
   font-weight: 500 !important;
   transition:
-    transform 0.25s var(--ease-out-quart),
-    box-shadow 0.25s var(--ease-out-quart),
-    background 0.25s ease,
-    border-color 0.25s ease,
-    color 0.25s ease !important;
-}
-
-.ant-btn:not(.ant-btn-link):not(.ant-btn-text):hover {
-  transform: translateY(-1px);
+    transform 0.2s var(--ease-out-quart),
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease !important;
 }
 
 .ant-btn-default {
   border-color: var(--ink-200) !important;
   background: #FFFFFF !important;
   color: var(--ink-700) !important;
-  box-shadow: var(--shadow-xs) !important;
+  box-shadow: none !important;
 }
 .ant-btn-default:hover {
-  border-color: var(--blue-400) !important;
-  color: var(--blue-500) !important;
-  background: var(--blue-50) !important;
+  border-color: var(--ink-900) !important;
+  color: var(--ink-900) !important;
+  background: var(--cream-100) !important;
 }
 
 .ant-btn-primary {
-  background: var(--gradient-primary) !important;
-  border: none !important;
+  background: var(--ink-900) !important;
+  border: 1px solid var(--ink-900) !important;
   color: #fff !important;
-  box-shadow: 0 4px 16px rgba(0, 102, 255, 0.30) !important;
+  box-shadow: none !important;
 }
 .ant-btn-primary:hover {
-  box-shadow: 0 8px 28px rgba(0, 102, 255, 0.40) !important;
+  background: var(--hot-600) !important;
+  border-color: var(--hot-600) !important;
 }
 .ant-btn-primary:disabled,
 .ant-btn-primary[disabled] {
   background: var(--ink-200) !important;
-  color: rgba(255, 255, 255, 0.7) !important;
-  box-shadow: none !important;
+  border-color: var(--ink-200) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
 }
 
 .ant-btn-dangerous.ant-btn-primary {
-  background: linear-gradient(135deg, #DC2626 0%, #EF4444 100%) !important;
-  box-shadow: 0 4px 16px rgba(220, 38, 38, 0.28) !important;
+  background: #B91C1C !important;
+  border-color: #B91C1C !important;
 }
 .ant-btn-dangerous.ant-btn-default {
-  border-color: rgba(220, 38, 38, 0.35) !important;
-  color: #DC2626 !important;
+  border-color: rgba(185, 28, 28, 0.35) !important;
+  color: #B91C1C !important;
 }
 
 .ant-btn-link {
-  color: var(--blue-500) !important;
+  color: var(--hot-600) !important;
 }
 .ant-btn-link:hover {
-  color: var(--blue-600) !important;
+  color: var(--ink-900) !important;
 }
 
 /* Inputs */
@@ -233,7 +197,7 @@ a:hover {
   border-radius: 10px !important;
   border-color: var(--ink-200) !important;
   background: #FFFFFF !important;
-  transition: all 0.22s var(--ease-out-quart) !important;
+  transition: all 0.2s var(--ease-out-quart) !important;
 }
 
 .ant-input:hover,
@@ -242,7 +206,7 @@ a:hover {
 .ant-input-password:hover,
 .ant-picker:hover,
 .ant-select:hover .ant-select-selector {
-  border-color: var(--blue-400) !important;
+  border-color: var(--ink-700) !important;
 }
 
 .ant-input:focus,
@@ -251,7 +215,7 @@ a:hover {
 .ant-input-number-focused,
 .ant-picker-focused,
 .ant-select-focused .ant-select-selector {
-  border-color: var(--blue-500) !important;
+  border-color: var(--ink-900) !important;
   box-shadow: var(--shadow-focus) !important;
 }
 
@@ -266,7 +230,6 @@ textarea.ant-input::placeholder {
   color: var(--ink-700) !important;
   font-weight: 500 !important;
   font-size: 13.5px !important;
-  letter-spacing: 0.01em;
 }
 
 /* Menu */
@@ -278,27 +241,27 @@ textarea.ant-input::placeholder {
 }
 .ant-menu-horizontal > .ant-menu-item,
 .ant-menu-horizontal > .ant-menu-submenu {
-  color: var(--ink-600) !important;
+  color: var(--ink-700) !important;
   font-weight: 500 !important;
   padding: 0 18px !important;
-  transition: color 0.22s var(--ease-out-quart) !important;
+  transition: color 0.2s var(--ease-out-quart) !important;
 }
 .ant-menu-horizontal > .ant-menu-item::after,
 .ant-menu-horizontal > .ant-menu-submenu::after {
   border-bottom: 2px solid transparent !important;
   bottom: 18px !important;
   inset-inline: 18px !important;
-  transition: border-color 0.25s var(--ease-out-quart), inset-inline 0.3s var(--ease-out-quart) !important;
+  transition: border-color 0.25s var(--ease-out-quart) !important;
 }
 .ant-menu-horizontal > .ant-menu-item:hover,
 .ant-menu-horizontal > .ant-menu-submenu:hover,
 .ant-menu-horizontal > .ant-menu-item-selected,
 .ant-menu-horizontal > .ant-menu-submenu-selected {
-  color: var(--blue-600) !important;
+  color: var(--ink-900) !important;
 }
 .ant-menu-horizontal > .ant-menu-item-selected::after,
 .ant-menu-horizontal > .ant-menu-item:hover::after {
-  border-bottom-color: var(--blue-500) !important;
+  border-bottom-color: var(--hot-600) !important;
 }
 
 /* Pagination */
@@ -307,28 +270,28 @@ textarea.ant-input::placeholder {
 .ant-pagination .ant-pagination-next,
 .ant-pagination .ant-pagination-jump-prev,
 .ant-pagination .ant-pagination-jump-next {
-  border-radius: 10px !important;
+  border-radius: 8px !important;
   border-color: var(--ink-200) !important;
   background: #FFFFFF !important;
-  box-shadow: var(--shadow-xs) !important;
-  transition: all 0.22s var(--ease-out-quart);
+  box-shadow: none !important;
+  transition: all 0.2s var(--ease-out-quart);
 }
 .ant-pagination .ant-pagination-item a {
-  color: var(--ink-600) !important;
+  color: var(--ink-700) !important;
 }
 .ant-pagination .ant-pagination-item:hover,
 .ant-pagination .ant-pagination-prev:hover,
 .ant-pagination .ant-pagination-next:hover {
-  border-color: var(--blue-400) !important;
-  background: var(--blue-50) !important;
+  border-color: var(--ink-900) !important;
+  background: var(--cream-100) !important;
 }
 .ant-pagination .ant-pagination-item:hover a {
-  color: var(--blue-500) !important;
+  color: var(--ink-900) !important;
 }
 .ant-pagination .ant-pagination-item-active {
-  background: var(--gradient-primary) !important;
-  border: none !important;
-  box-shadow: 0 4px 14px rgba(0, 102, 255, 0.28) !important;
+  background: var(--ink-900) !important;
+  border-color: var(--ink-900) !important;
+  box-shadow: none !important;
 }
 .ant-pagination .ant-pagination-item-active a {
   color: #fff !important;
@@ -341,8 +304,8 @@ textarea.ant-input::placeholder {
   font-family: var(--font-sans);
 }
 .ant-table-thead > tr > th {
-  background: var(--ink-50) !important;
-  color: var(--ink-600) !important;
+  background: var(--cream-100) !important;
+  color: var(--ink-700) !important;
   font-weight: 600 !important;
   font-size: 12.5px !important;
   letter-spacing: 0.05em;
@@ -356,7 +319,7 @@ textarea.ant-input::placeholder {
 }
 .ant-table-tbody > tr:hover > td,
 .ant-table-tbody > tr.ant-table-row-hover > td {
-  background: var(--blue-50) !important;
+  background: var(--hot-50) !important;
 }
 
 /* Divider */
@@ -367,14 +330,14 @@ textarea.ant-input::placeholder {
 
 /* Avatar */
 .ant-avatar {
-  background: var(--gradient-primary) !important;
+  background: var(--hot-600) !important;
   color: #fff !important;
   font-weight: 600;
 }
 
 /* Spin */
 .ant-spin-dot-item {
-  background-color: var(--blue-500) !important;
+  background-color: var(--hot-600) !important;
 }
 
 /* Empty */
@@ -384,12 +347,12 @@ textarea.ant-input::placeholder {
 
 /* Modal */
 .ant-modal-content {
-  border-radius: 20px !important;
+  border-radius: 16px !important;
   box-shadow: var(--shadow-lg) !important;
   background: #FFFFFF !important;
 }
 .ant-modal-header {
-  border-radius: 20px 20px 0 0 !important;
+  border-radius: 16px 16px 0 0 !important;
   background: transparent !important;
   border-bottom: 1px solid var(--ink-100) !important;
 }
@@ -397,12 +360,11 @@ textarea.ant-input::placeholder {
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
   color: var(--ink-900) !important;
-  letter-spacing: -0.01em;
 }
 
 /* Message */
 .ant-message-notice-content {
-  border-radius: 12px !important;
+  border-radius: 10px !important;
   box-shadow: var(--shadow-md) !important;
 }
 
@@ -417,14 +379,14 @@ textarea.ant-input::placeholder {
   transition: background 0.2s ease;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--ink-300);
+  background: var(--ink-400);
   background-clip: padding-box;
   border: 2px solid transparent;
 }
 
 /* ── Utility Animations ── */
 @keyframes fadeUp {
-  0%   { opacity: 0; transform: translateY(20px); }
+  0%   { opacity: 0; transform: translateY(14px); }
   100% { opacity: 1; transform: translateY(0); }
 }
 
@@ -433,16 +395,6 @@ textarea.ant-input::placeholder {
   100% { opacity: 1; }
 }
 
-@keyframes shimmer {
-  0%   { background-position: 0% 50%; }
-  100% { background-position: 200% 50%; }
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.6; }
-}
-
 .fade-up {
-  animation: fadeUp 0.7s var(--ease-out-expo) both;
+  animation: fadeUp 0.55s var(--ease-out-expo) both;
 }

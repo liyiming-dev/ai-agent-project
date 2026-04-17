@@ -113,26 +113,10 @@ const handleLogout = async () => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.88);
-  backdrop-filter: saturate(180%) blur(20px);
-  -webkit-backdrop-filter: saturate(180%) blur(20px);
-}
-
-.global-header::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(0, 102, 255, 0.10) 20%,
-    rgba(0, 102, 255, 0.18) 50%,
-    rgba(0, 102, 255, 0.10) 80%,
-    transparent 100%
-  );
+  background: rgba(252, 250, 245, 0.88);
+  backdrop-filter: saturate(160%) blur(16px);
+  -webkit-backdrop-filter: saturate(160%) blur(16px);
+  border-bottom: 1px solid var(--ink-200);
 }
 
 .header-content {
@@ -160,22 +144,22 @@ const handleLogout = async () => {
 
 .brand-logo-wrap {
   position: relative;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   overflow: hidden;
-  box-shadow: 0 10px 22px rgba(15, 123, 138, 0.28),
-              inset 0 0 0 1px rgba(255, 255, 255, 0.45);
+  background: var(--hot-600);
+  box-shadow: inset 0 0 0 2px var(--ink-900);
 }
 
 .brand-logo-wrap::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--gradient-primary);
-  opacity: 0.12;
+  background: var(--hot-600);
   z-index: 1;
   pointer-events: none;
+  mix-blend-mode: multiply;
 }
 
 .brand-logo {
@@ -193,29 +177,26 @@ const handleLogout = async () => {
 
 .brand-title {
   font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 21px;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  font-size: 19px;
+  letter-spacing: 0;
   color: var(--ink-900);
   white-space: nowrap;
 }
 
 .brand-title em {
   font-style: normal;
-  font-weight: 800;
-  background: var(--gradient-text);
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  font-weight: 700;
+  color: var(--hot-600);
 }
 
 .brand-kicker {
   margin-top: 4px;
-  font-size: 10px;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--ink-400);
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  color: var(--ink-500);
+  font-weight: 500;
 }
 
 .header-menu {
@@ -236,13 +217,11 @@ const handleLogout = async () => {
   border-radius: 999px;
   background: #FFFFFF;
   border: 1px solid var(--ink-200);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
-  transition: border-color 0.25s var(--ease-out-quart), box-shadow 0.25s var(--ease-out-quart);
+  transition: border-color 0.2s var(--ease-out-quart);
 }
 
 .login-user:hover {
-  border-color: var(--blue-300);
-  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.10);
+  border-color: var(--ink-900);
 }
 
 .user-name {
