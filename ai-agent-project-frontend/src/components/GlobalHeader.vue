@@ -113,9 +113,9 @@ const handleLogout = async () => {
   position: sticky;
   top: 0;
   z-index: 100;
-  background: rgba(247, 252, 251, 0.72);
-  backdrop-filter: saturate(140%) blur(18px);
-  -webkit-backdrop-filter: saturate(140%) blur(18px);
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
 }
 
 .global-header::after {
@@ -128,9 +128,9 @@ const handleLogout = async () => {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(15, 123, 138, 0.18) 18%,
-    rgba(61, 214, 208, 0.28) 50%,
-    rgba(15, 123, 138, 0.18) 82%,
+    rgba(0, 102, 255, 0.10) 20%,
+    rgba(0, 102, 255, 0.18) 50%,
+    rgba(0, 102, 255, 0.10) 80%,
     transparent 100%
   );
 }
@@ -193,16 +193,16 @@ const handleLogout = async () => {
 
 .brand-title {
   font-family: var(--font-display);
-  font-weight: 500;
-  font-size: 22px;
-  letter-spacing: -0.01em;
-  color: var(--ink-800);
+  font-weight: 700;
+  font-size: 21px;
+  letter-spacing: -0.02em;
+  color: var(--ink-900);
   white-space: nowrap;
 }
 
 .brand-title em {
-  font-style: italic;
-  font-weight: 400;
+  font-style: normal;
+  font-weight: 800;
   background: var(--gradient-text);
   background-clip: text;
   -webkit-background-clip: text;
@@ -211,11 +211,11 @@ const handleLogout = async () => {
 
 .brand-kicker {
   margin-top: 4px;
-  font-size: 10.5px;
-  letter-spacing: 0.26em;
+  font-size: 10px;
+  letter-spacing: 0.3em;
   text-transform: uppercase;
   color: var(--ink-400);
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .header-menu {
@@ -234,14 +234,15 @@ const handleLogout = async () => {
   align-items: center;
   padding: 6px 14px 6px 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(15, 123, 138, 0.1);
-  transition: border-color 0.25s var(--ease-out-quart), background 0.25s var(--ease-out-quart);
+  background: #FFFFFF;
+  border: 1px solid var(--ink-200);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  transition: border-color 0.25s var(--ease-out-quart), box-shadow 0.25s var(--ease-out-quart);
 }
 
 .login-user:hover {
-  border-color: rgba(15, 123, 138, 0.25);
-  background: rgba(255, 255, 255, 0.82);
+  border-color: var(--blue-300);
+  box-shadow: 0 2px 8px rgba(0, 102, 255, 0.10);
 }
 
 .user-name {
