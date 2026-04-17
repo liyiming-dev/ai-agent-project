@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>首页改版预览 · 方向 B · Warm Tech</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F7F3ED;             /* 暖米白 */
+    --bg-soft: #EFEADF;
+    --ink-900: #1C1A17;
+    --ink-700: #3E3A33;
+    --ink-500: #7A7167;
+    --ink-400: #A59C90;
+    --ink-200: #D9D1C2;
+    --ink-100: #E7DFCD;
+    --brand: #2B5CE6;          /* 降饱和蓝 */
+    --brand-soft: #E5ECFB;
+    --hot: #C2410C;            /* 陶土橙 */
+    --hot-soft: #F4D9C7;
+    --serif: 'Noto Serif SC', 'Source Han Serif SC', serif;
+    --sans: 'Inter', 'PingFang SC', 'HarmonyOS Sans SC', sans-serif;
+    --mono: 'JetBrains Mono', Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background: var(--bg); color: var(--ink-900); font-family: var(--sans); font-size: 15px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+
+  /* annotation */
+  .anno { background: var(--ink-900); color: var(--bg); font-family: var(--mono); font-size: 12px; padding: 8px 48px; display:flex; gap:16px; align-items:center; }
+  .anno .tag { background: var(--hot); color: #fff; padding: 1px 6px; border-radius: 2px; font-size: 10px; }
+
+  /* nav */
+  .nav { display:flex; align-items:center; justify-content:space-between; padding: 20px 48px; border-bottom: 1px solid var(--ink-200); }
+  .brand { display:flex; align-items:center; gap:10px; font-weight:600; font-size:16px; }
+  .brand-dot { width:26px; height:26px; border-radius:50%; background:var(--hot); color:#fff; display:grid; place-items:center; font-family:var(--mono); font-size:11px; font-weight:600; }
+  .nav-links { display:flex; gap:28px; font-size:14px; color: var(--ink-700); }
+  .nav-links a { color:inherit; text-decoration:none; padding: 4px 10px; border-radius: 999px; }
+  .nav-links a.active { background: var(--ink-900); color: var(--bg); }
+  .nav-user { display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-500); }
+  .nav-user .av { width:26px; height:26px; border-radius:50%; background: var(--brand); color:#fff; display:grid; place-items:center; font-size:12px; }
+
+  /* page */
+  .page { max-width: 1240px; margin: 0 auto; padding: 0 48px 120px; position: relative; }
+
+  /* hero — left text, right illustration */
+  .hero { display:grid; grid-template-columns: 1.1fr .9fr; gap: 60px; align-items: center; padding: 80px 0 60px; }
+  .hero-left .kicker { display:inline-flex; align-items:center; gap:8px; font-family: var(--mono); font-size:12px; letter-spacing:.06em; color: var(--hot); background: var(--hot-soft); padding: 4px 10px; border-radius: 999px; }
+  .hero-left .kicker::before { content:''; width:6px; height:6px; background: var(--hot); border-radius:50%; }
+  .hero h1 { font-family: var(--serif); font-weight:600; font-size: clamp(44px, 5.6vw, 64px); line-height:1.12; margin: 24px 0 20px; letter-spacing: -0.01em; }
+  .hero h1 .hl { background: linear-gradient(transparent 62%, var(--hot-soft) 62%); padding: 0 4px; }
+  .hero p.lead { font-size: 16px; color: var(--ink-700); max-width: 520px; margin: 0 0 32px; }
+  .cta-row { display:flex; gap: 12px; align-items: center; }
+  .btn-primary { background: var(--ink-900); color: var(--bg); border: 0; padding: 12px 20px; border-radius: 999px; font-size: 14px; cursor:pointer; display:inline-flex; align-items:center; gap:8px; }
+  .btn-primary:hover { background: var(--hot); }
+  .btn-ghost { background: transparent; border: 1px solid var(--ink-200); color: var(--ink-700); padding: 12px 18px; border-radius: 999px; font-size: 14px; cursor:pointer; }
+  .btn-ghost:hover { border-color: var(--ink-900); color: var(--ink-900); }
+
+  /* illustration - SVG hand-drawn feel */
+  .hero-illus { position: relative; aspect-ratio: 1/1; max-width: 440px; justify-self: end; }
+  .hero-illus svg { width: 100%; height: 100%; }
+
+  /* prompt card — warm paper */
+  .prompt-wrap { margin-top: 64px; }
+  .prompt { background: #fff; border: 1px solid var(--ink-200); border-radius: 14px; padding: 18px 20px 14px; box-shadow: 0 2px 0 var(--ink-200); transition: box-shadow .2s ease, transform .2s ease; max-width: 860px; }
+  .prompt:focus-within { box-shadow: 0 4px 0 var(--ink-900); transform: translateY(-2px); }
+  .prompt textarea { width:100%; border:0; outline:0; resize:none; font-family: var(--sans); font-size: 15px; background: transparent; min-height: 80px; color: var(--ink-900); }
+  .prompt textarea::placeholder { color: var(--ink-400); }
+  .prompt-row { display:flex; justify-content:space-between; align-items:center; padding-top: 10px; border-top: 1px dashed var(--ink-200); margin-top: 10px; }
+  .prompt-hint { font-family: var(--mono); font-size: 11px; color: var(--ink-500); }
+  .send-btn { background: var(--hot); color: #fff; border: 0; padding: 8px 16px; border-radius: 999px; font-size: 13px; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .send-btn:hover { background: var(--ink-900); }
+
+  .suggest { margin-top: 20px; display:flex; flex-wrap:wrap; gap: 8px; max-width: 860px; align-items:center; }
+  .suggest .label { font-family: var(--mono); font-size: 11px; color: var(--ink-500); margin-right: 4px; }
+  .chip { border: 1px dashed var(--ink-200); background: transparent; color: var(--ink-700); font-size: 13px; padding: 6px 12px; border-radius: 999px; cursor: pointer; font-family: var(--sans); }
+  .chip:hover { border-style: solid; border-color: var(--ink-900); background: var(--bg-soft); }
+
+  /* section */
+  .section { margin-top: 112px; }
+  .section-head { display:flex; align-items:baseline; gap: 16px; margin-bottom: 28px; }
+  .section-head h2 { font-family: var(--serif); font-weight: 600; font-size: 28px; margin: 0; }
+  .section-head .badge { font-family: var(--mono); font-size: 11px; color: var(--hot); background: var(--hot-soft); padding: 2px 8px; border-radius: 4px; }
+  .section-head .spacer { flex:1; }
+  .section-head .all { font-size: 13px; color: var(--ink-700); text-decoration: none; border-bottom: 1px solid var(--ink-400); padding-bottom: 1px; }
+  .section-head .all:hover { color: var(--hot); border-color: var(--hot); }
+
+  /* grid */
+  .grid { display:grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+  .card { background: #fff; border: 1px solid var(--ink-200); border-radius: 12px; overflow: hidden; transition: transform .25s ease, box-shadow .25s ease; cursor: pointer; }
+  .card:hover { transform: translateY(-4px); box-shadow: 0 10px 0 -4px var(--ink-200), 0 14px 30px rgba(28,26,23,.08); }
+  .cover { position: relative; aspect-ratio: 4/3; display:grid; place-items:center; overflow:hidden; }
+  .cover .mark { font-family: var(--serif); font-size: 72px; font-weight: 600; color: #fff; }
+  .cover.warm-0 { background: linear-gradient(135deg, #F3B178 0%, #C2410C 100%); }
+  .cover.warm-1 { background: linear-gradient(135deg, #EBD5A2 0%, #8A6A2B 100%); }
+  .cover.warm-2 { background: linear-gradient(135deg, #A7C4E4 0%, #2B5CE6 100%); }
+  .cover.warm-3 { background: linear-gradient(135deg, #C8B5A1 0%, #6B4F36 100%); }
+  .cover.warm-4 { background: linear-gradient(135deg, #D4A5C3 0%, #7A3F66 100%); }
+  .cover.warm-5 { background: linear-gradient(135deg, #2E2A24 0%, #1C1A17 100%); }
+  .cover .pill { position:absolute; top: 12px; left: 12px; font-family: var(--mono); font-size: 10px; letter-spacing:.08em; background: rgba(255,255,255,.85); color: var(--ink-900); padding: 3px 8px; border-radius: 999px; }
+  .cover .pill.hot { background: var(--hot); color: #fff; }
+  .body { padding: 14px 16px 16px; }
+  .body .name { font-size: 15px; font-weight: 600; color: var(--ink-900); margin-bottom: 4px; }
+  .body .meta { font-size: 12px; color: var(--ink-500); font-family: var(--mono); display:flex; justify-content:space-between; }
+  .body .meta .deployed { color: var(--hot); }
+
+  /* responsive */
+  @media (max-width: 900px) { .hero { grid-template-columns: 1fr; } .hero-illus { justify-self: start; } .grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+
+<div class="anno"><span class="tag">PREVIEW</span><span>方向 B · Warm Tech — 暖米白 + 降饱和蓝 + 陶土橙点睛(Anthropic 路线)</span></div>
+
+<header class="nav">
+  <div class="brand"><span class="brand-dot">AI</span><span>一句 · 呈所想</span></div>
+  <nav class="nav-links"><a class="active">主页</a><a>用户</a><a>应用</a><a>关于</a></nav>
+  <div class="nav-user"><div class="av">U</div><span>退出</span></div>
+</header>
+
+<main class="page">
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-left">
+    <span class="kicker">v0.5 · 一句话生成</span>
+    <h1>把想法<span class="hl">讲出来</span>,<br>网站就<span class="hl">做出来</span>。</h1>
+    <p class="lead">用你最自然的语言描述,AI 会写出 HTML、CSS 和交互,并立刻为你部署一个可访问的站点 —— 像把草图交给一位不知疲倦的手作工匠。</p>
+    <div class="cta-row">
+      <button class="btn-primary">开始创建 →</button>
+      <button class="btn-ghost">看看别人做的</button>
+    </div>
+  </div>
+
+  <!-- Hand-drawn-ish illustration: paper + pencil + code snippet -->
+  <div class="hero-illus" aria-hidden="true">
+    <svg viewBox="0 0 440 440" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- bg circle soft -->
+      <circle cx="220" cy="220" r="200" fill="#EFEADF"/>
+      <!-- paper card -->
+      <g transform="rotate(-6 220 220)">
+        <rect x="90" y="110" width="260" height="220" rx="8" fill="#FFFFFF" stroke="#1C1A17" stroke-width="2"/>
+        <line x1="110" y1="150" x2="300" y2="150" stroke="#D9D1C2" stroke-width="2" stroke-dasharray="4 6"/>
+        <line x1="110" y1="175" x2="280" y2="175" stroke="#D9D1C2" stroke-width="2" stroke-dasharray="4 6"/>
+        <line x1="110" y1="200" x2="260" y2="200" stroke="#D9D1C2" stroke-width="2" stroke-dasharray="4 6"/>
+        <rect x="110" y="230" width="90" height="60" rx="4" fill="#F4D9C7" stroke="#C2410C" stroke-width="2"/>
+        <rect x="210" y="230" width="90" height="60" rx="4" fill="#E5ECFB" stroke="#2B5CE6" stroke-width="2"/>
+      </g>
+      <!-- pencil -->
+      <g transform="rotate(28 340 110)">
+        <rect x="290" y="100" width="120" height="18" rx="3" fill="#C2410C" stroke="#1C1A17" stroke-width="2"/>
+        <polygon points="410,100 430,109 410,118" fill="#1C1A17"/>
+        <rect x="290" y="100" width="22" height="18" fill="#F4D9C7" stroke="#1C1A17" stroke-width="2"/>
+      </g>
+      <!-- small code chip -->
+      <g transform="rotate(8 110 330)">
+        <rect x="60" y="310" width="110" height="60" rx="6" fill="#1C1A17"/>
+        <text x="72" y="335" fill="#F4D9C7" font-family="monospace" font-size="11">&lt;site/&gt;</text>
+        <text x="72" y="352" fill="#A7C4E4" font-family="monospace" font-size="11">build()</text>
+      </g>
+      <!-- dots -->
+      <circle cx="70" cy="90" r="5" fill="#C2410C"/>
+      <circle cx="380" cy="360" r="6" fill="#2B5CE6"/>
+      <circle cx="395" cy="150" r="3" fill="#1C1A17"/>
+    </svg>
+  </div>
+</section>
+
+<!-- PROMPT -->
+<div class="prompt-wrap">
+  <div class="prompt">
+    <textarea placeholder="例如:创建一个极简的待办清单,支持本地存储…"></textarea>
+    <div class="prompt-row">
+      <span class="prompt-hint">Ctrl / ⌘ + Enter 发送</span>
+      <button class="send-btn">发送 →</button>
+    </div>
+  </div>
+  <div class="suggest">
+    <span class="label">灵感起点</span>
+    <button class="chip">波普风电商页面</button>
+    <button class="chip">企业网站</button>
+    <button class="chip">电商运营后台</button>
+    <button class="chip">暗黑话题社区</button>
+  </div>
+</div>
+
+<!-- MY WORKS -->
+<section class="section">
+  <div class="section-head">
+    <h2>我的作品</h2><span class="badge">06 件</span>
+    <span class="spacer"></span>
+    <a class="all" href="#">查看全部</a>
+  </div>
+  <div class="grid">
+    <article class="card">
+      <div class="cover warm-0"><span class="pill hot">最新</span><span class="mark">Bo</span></div>
+      <div class="body"><div class="name">简单的个人博客页面</div><div class="meta"><span>@anon · 4h</span><span class="deployed">● 已部署</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover warm-1"><span class="mark">AI</span></div>
+      <div class="body"><div class="name">AI 智能助手产品站</div><div class="meta"><span>@anon · 1d</span><span>草稿</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover warm-2"><span class="mark">Sh</span></div>
+      <div class="body"><div class="name">电商运营后台</div><div class="meta"><span>@anon · 2d</span><span class="deployed">● 已部署</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover warm-3"><span class="mark">Lo</span></div>
+      <div class="body"><div class="name">用户登录简单页面</div><div class="meta"><span>@anon · 3d</span><span>草稿</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover warm-4"><span class="mark">Po</span></div>
+      <div class="body"><div class="name">波普风电商页面</div><div class="meta"><span>@anon · 5d</span><span class="deployed">● 已部署</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover warm-5"><span class="mark">Dk</span></div>
+      <div class="body"><div class="name">暗黑话题社区</div><div class="meta"><span>@anon · 6d</span><span>草稿</span></div></div>
+    </article>
+  </div>
+</section>
+
+<!-- CURATED -->
+<section class="section">
+  <div class="section-head">
+    <h2>精选案例</h2><span class="badge">curated</span>
+    <span class="spacer"></span>
+    <a class="all" href="#">查看全部</a>
+  </div>
+  <div class="grid">
+    <article class="card">
+      <div class="cover warm-2"><span class="pill hot">精选</span><span class="mark">Nt</span></div>
+      <div class="body"><div class="name">极简待办清单</div><div class="meta"><span>@demo</span><span class="deployed">● 已部署</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover warm-0"><span class="pill hot">精选</span><span class="mark">Rd</span></div>
+      <div class="body"><div class="name">阅读笔记 Wiki</div><div class="meta"><span>@demo</span><span class="deployed">● 已部署</span></div></div>
+    </article>
+    <article class="card">
+      <div class="cover warm-1"><span class="pill hot">精选</span><span class="mark">Fm</span></div>
+      <div class="body"><div class="name">表单生成器</div><div class="meta"><span>@demo</span><span class="deployed">● 已部署</span></div></div>
+    </article>
+  </div>
+</section>
+
+</main>
+</body>
+</html>
