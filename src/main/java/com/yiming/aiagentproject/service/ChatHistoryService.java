@@ -6,6 +6,7 @@ import com.mybatisflex.core.service.IService;
 import com.yiming.aiagentproject.model.dto.chatHistory.ChatHistoryQueryRequest;
 import com.yiming.aiagentproject.model.entity.ChatHistory;
 import com.yiming.aiagentproject.model.entity.User;
+import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import reactor.core.publisher.Flux;
 
 import java.time.LocalDateTime;
@@ -28,4 +29,6 @@ public interface ChatHistoryService extends IService<ChatHistory> {
     Page<ChatHistory> listAppChatHistoryByPage(Long appId, int pageSize,
                                                LocalDateTime lastCreateTime,
                                                User loginUser);
+
+    int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount);
 }
