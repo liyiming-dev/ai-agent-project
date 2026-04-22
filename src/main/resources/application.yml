@@ -4,6 +4,11 @@ spring:
   profiles:
     active: local
 
+  # session
+  session:
+    store-type: redis
+    # session三十天过期
+    timeout: 2592000
   # mysql
   datasource:
     url: jdbc:mysql://127.0.0.1:3306/ai_agent_project
@@ -23,6 +28,10 @@ server:
   port: 8123
   servlet:
     context-path: /api
+    # cookie 30天过期
+    session:
+      cookie:
+        max-age: 2592000
 
 # springdoc-openapi????
 springdoc:

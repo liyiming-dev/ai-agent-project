@@ -140,8 +140,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (!app.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
-
-
         // 4. 获取应用的代码生成类型
         String codeGenTypeStr = app.getCodeGenType();
         CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
