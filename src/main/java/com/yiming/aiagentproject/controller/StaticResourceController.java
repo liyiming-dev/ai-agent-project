@@ -50,9 +50,9 @@ public class StaticResourceController {
                 headers.add("Location", request.getRequestURI() + "/");
                 return new ResponseEntity<>(headers, HttpStatus.MOVED_PERMANENTLY);
             }
-            // 默认返回 index.html
-            if (resourcePath.equals("/")) {
-                resourcePath = "/index.html";
+            // 任何以 "/" 结尾的目录访问都默认返回 index.html（例如 "/"、"/dist/"）
+            if (resourcePath.endsWith("/")) {
+                resourcePath += "index.html";
             }
             // 依次在候选根目录中查找文件
             File file = null;

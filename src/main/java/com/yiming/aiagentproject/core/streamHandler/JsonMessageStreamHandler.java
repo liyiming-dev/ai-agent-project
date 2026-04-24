@@ -18,6 +18,8 @@ import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.util.HashSet;
@@ -56,15 +58,22 @@ public class JsonMessageStreamHandler {
                     return handleJsonMessageChunk(chunk, chatHistoryStringBuilder, seenToolIds);
                 })
                 .filter(StrUtil::isNotEmpty) // 过滤空字串
-                .doOnComplete(() -> {
-                    // 流式响应完成后，添加 AI 消息到对话历史
+                .concatWith(Flux.defer(() -> {
+                    // AI 生成完毕：先落库聊天历史，再同步执行 Vue 构建，最后才让流 complete
+                    // 这样 Controller 在 Flux 结束后补发的 done 事件到达前端时，dist/ 已就绪
                     String aiResponse = chatHistoryStringBuilder.toString();
-
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
-                    // 异步构造 Vue 项目
                     String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
-                    vueProjectBuilder.buildProjectAsync(projectPath);
-                })
+                    return Flux.concat(
+                            Flux.just("\n\n[构建 Vue 项目] 正在执行 npm install 和 npm run build，请稍候...\n\n"),
+                            Mono.fromCallable(() -> vueProjectBuilder.buildProject(projectPath))
+                                    .subscribeOn(Schedulers.boundedElastic())
+                                    .map(success -> success
+                                            ? "\n\n[构建成功] 预览已就绪\n\n"
+                                            : "\n\n[构建失败] 请查看后端日志\n\n")
+                                    .onErrorResume(e -> Mono.just("\n\n[构建异常] " + e.getMessage() + "\n\n"))
+                    );
+                }))
                 .doOnError(error -> {
                     // 如果AI回复失败，也要记录错误消息
                     String errorMessage = "AI回复失败: " + error.getMessage();

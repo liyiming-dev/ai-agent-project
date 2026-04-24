@@ -76,7 +76,9 @@ let stoppedByUser = false
 
 const previewUrl = computed(() => {
   if (!app.value?.codeGenType || !app.value?.id) return ''
-  const base = `http://localhost:8123/api/static/${app.value.codeGenType}_${app.value.id}/`
+  // Vue 项目经过 npm run build 后，产物在 dist/ 子目录中，需要在路径中追加 /dist
+  const isVueProject = app.value.codeGenType === 'vue_project'
+  const base = `http://localhost:8123/api/static/${app.value.codeGenType}_${app.value.id}${isVueProject ? '/dist' : ''}/`
   return previewVersion.value ? `${base}?t=${previewVersion.value}` : base
 })
 
