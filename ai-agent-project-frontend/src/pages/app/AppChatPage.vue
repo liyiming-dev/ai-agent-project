@@ -8,6 +8,7 @@ import 'highlight.js/styles/atom-one-dark.css'
 import { deleteApp, deployApp, downloadAppCode, getAppVoById } from '@/api/api/appController'
 import { listAppChatHistory } from '@/api/api/chatHistoryController'
 import { useLoginUserStore } from '@/stores/loginUser'
+import { buildSelectedElementPrompt, useVisualEditor } from '@/utils/visualEditor'
 
 type ChatMessage = {
   role: 'user' | 'ai'
@@ -83,15 +84,28 @@ const codeGenTypeMeta = computed(() => {
 })
 
 const messagesRef = ref<HTMLElement | null>(null)
+const previewIframeRef = ref<HTMLIFrameElement | null>(null)
 let eventSource: EventSource | null = null
 let doneReceived = false
 let stoppedByUser = false
+
+// 可视化编辑模式
+const {
+  editMode,
+  selectedElement,
+  toggleEdit,
+  disableEdit,
+  clearSelection,
+  handleIframeLoad,
+} = useVisualEditor(previewIframeRef)
 
 const previewUrl = computed(() => {
   if (!app.value?.codeGenType || !app.value?.id) return ''
   // Vue 项目经过 npm run build 后，产物在 dist/ 子目录中，需要在路径中追加 /dist
   const isVueProject = app.value.codeGenType === 'vue_project'
-  const base = `http://localhost:8123/api/static/${app.value.codeGenType}_${app.value.id}${isVueProject ? '/dist' : ''}/`
+  // 使用相对路径，让 iframe 与主站同源：dev 走 vite 代理，生产由反向代理处理。
+  // 同源后 visualEditor 才能向 iframe 注入交互脚本。
+  const base = `/api/static/${app.value.codeGenType}_${app.value.id}${isVueProject ? '/dist' : ''}/`
   return previewVersion.value ? `${base}?t=${previewVersion.value}` : base
 })
 
@@ -269,8 +283,14 @@ const sendMessage = (text: string) => {
 const handleSend = () => {
   const text = inputMessage.value.trim()
   if (!text) return
+  // 如有可视化选中的元素，将其信息追加到提示词后一并发送给后端
+  const finalText = selectedElement.value
+    ? `${text}\n\n${buildSelectedElementPrompt(selectedElement.value)}`
+    : text
   inputMessage.value = ''
-  sendMessage(text)
+  // 发送后清除选中并退出编辑模式
+  disableEdit()
+  sendMessage(finalText)
 }
 
 const handleStop = () => {
@@ -532,6 +552,16 @@ onBeforeUnmount(() => {
           </div>
         </div>
         <div class="input-area">
+          <a-alert
+            v-if="selectedElement"
+            class="selected-alert"
+            type="info"
+            show-icon
+            closable
+            :message="`已选中元素：${selectedElement.tagName}${selectedElement.id ? '#' + selectedElement.id : ''}`"
+            :description="selectedElement.selector"
+            @close="clearSelection"
+          />
           <a-tooltip
             :title="app && !isOwner ? '无法在别人的作品下对话哦~' : ''"
             placement="top"
@@ -549,6 +579,19 @@ onBeforeUnmount(() => {
           <div class="input-actions">
             <span class="input-hint">Ctrl / ⌘ + Enter 发送</span>
             <a-space :size="10">
+              <a-tooltip
+                :title="editMode ? '退出可视化编辑' : '进入可视化编辑：在右侧网站点击元素来选中'"
+                placement="top"
+              >
+                <a-button
+                  :type="editMode ? 'primary' : 'default'"
+                  :ghost="editMode"
+                  :disabled="!isOwner || !previewReady"
+                  @click="toggleEdit"
+                >
+                  {{ editMode ? '退出编辑' : '可视化编辑' }}
+                </a-button>
+              </a-tooltip>
               <a-button v-if="sending" danger @click="handleStop">停止生成</a-button>
               <a-button
                 type="primary"
@@ -580,7 +623,13 @@ onBeforeUnmount(() => {
             </a-space>
           </div>
           <div class="preview-frame">
-            <iframe :key="previewVersion" :src="previewUrl" frameborder="0" />
+            <iframe
+              ref="previewIframeRef"
+              :key="previewVersion"
+              :src="previewUrl"
+              frameborder="0"
+              @load="handleIframeLoad"
+            />
           </div>
         </div>
         <div v-else class="preview-placeholder">
@@ -858,6 +907,11 @@ onBeforeUnmount(() => {
 
 .input-wrap {
   width: 100%;
+}
+
+.selected-alert {
+  margin-bottom: 10px;
+  border-radius: 10px;
 }
 
 .input-actions {
