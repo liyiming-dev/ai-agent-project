@@ -889,6 +889,30 @@
         }
       }
     },
+    "/app/download/{appId}": {
+      "get": {
+        "tags": [
+          "app-controller"
+        ],
+        "operationId": "downloadAppCode",
+        "parameters": [
+          {
+            "name": "appId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        }
+      }
+    },
     "/app/chat/gen/code": {
       "get": {
         "tags": [

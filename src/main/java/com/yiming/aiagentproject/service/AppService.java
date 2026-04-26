@@ -2,6 +2,7 @@ package com.yiming.aiagentproject.service;
 
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.service.IService;
+import com.yiming.aiagentproject.dto.app.AppAddDto;
 import com.yiming.aiagentproject.dto.app.AppQueryDto;
 import com.yiming.aiagentproject.model.entity.App;
 import com.yiming.aiagentproject.model.entity.User;
@@ -16,6 +17,8 @@ import java.util.List;
  * @author yiming
  */
 public interface AppService extends IService<App> {
+
+    Long createApp(AppAddDto appAddDto, User loginUser);
 
     /**
      * 获取应用视图对象

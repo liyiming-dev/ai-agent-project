@@ -5,7 +5,7 @@ import { message, Modal } from 'ant-design-vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/atom-one-dark.css'
-import { deleteApp, deployApp, getAppVoById } from '@/api/api/appController'
+import { deleteApp, deployApp, downloadAppCode, getAppVoById } from '@/api/api/appController'
 import { listAppChatHistory } from '@/api/api/chatHistoryController'
 import { useLoginUserStore } from '@/stores/loginUser'
 
@@ -52,6 +52,7 @@ const messages = ref<ChatMessage[]>([])
 const inputMessage = ref('')
 const sending = ref(false)
 const deploying = ref(false)
+const downloading = ref(false)
 const previewReady = ref(false)
 const previewVersion = ref(0)
 const initialSent = ref(false)
@@ -67,6 +68,18 @@ const totalHistoryCount = ref(0)
 const isOwner = computed(() => {
   const myId = loginUserStore.loginUser.id
   return !!(myId && app.value?.userId && app.value.userId === myId)
+})
+
+const CODE_GEN_TYPE_META: Record<string, { label: string; color: string }> = {
+  html: { label: 'HTML', color: 'cyan' },
+  multi_file: { label: '多文件', color: 'geekblue' },
+  vue_project: { label: 'Vue 工程', color: 'purple' },
+}
+
+const codeGenTypeMeta = computed(() => {
+  const key = app.value?.codeGenType
+  if (!key) return null
+  return CODE_GEN_TYPE_META[key] ?? { label: key, color: 'default' }
 })
 
 const messagesRef = ref<HTMLElement | null>(null)
@@ -302,6 +315,45 @@ const refreshPreview = () => {
   previewVersion.value = Date.now()
 }
 
+const handleDownload = async () => {
+  if (!appId.value) return
+  downloading.value = true
+  try {
+    const res = await downloadAppCode(
+      { appId: appId.value as unknown as number },
+      { responseType: 'blob' },
+    )
+    const blob = res.data as Blob
+    // 优先解析 Content-Disposition 中的文件名，兼容 RFC5987 与普通格式
+    const disposition = (res.headers?.['content-disposition'] ?? res.headers?.['Content-Disposition']) as
+      | string
+      | undefined
+    let filename = `${app.value?.appName || 'app'}-${appId.value}.zip`
+    if (disposition) {
+      const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+      const plainMatch = disposition.match(/filename="?([^";]+)"?/i)
+      if (utf8Match && utf8Match[1]) {
+        filename = decodeURIComponent(utf8Match[1])
+      } else if (plainMatch && plainMatch[1]) {
+        filename = plainMatch[1]
+      }
+    }
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+    message.success('下载成功')
+  } catch {
+    message.error('下载失败')
+  } finally {
+    downloading.value = false
+  }
+}
+
 const handleDeploy = async () => {
   if (!appId.value) return
   deploying.value = true
@@ -409,11 +461,27 @@ onBeforeUnmount(() => {
         </span>
         <div class="app-title-group">
           <span class="app-kicker">Workspace</span>
-          <span class="app-name">{{ app?.appName || '加载中...' }}</span>
+          <div class="app-name-row">
+            <span class="app-name">{{ app?.appName || '加载中...' }}</span>
+            <a-tag
+              v-if="codeGenTypeMeta"
+              :color="codeGenTypeMeta.color"
+              class="app-type-tag"
+            >
+              {{ codeGenTypeMeta.label }}
+            </a-tag>
+          </div>
         </div>
       </div>
       <a-space :size="10">
         <a-button :disabled="!app" @click="openDetail">应用详情</a-button>
+        <a-button
+          :loading="downloading"
+          :disabled="!isOwner"
+          @click="handleDownload"
+        >
+          下载代码
+        </a-button>
         <a-button
           type="primary"
           :loading="deploying"
@@ -544,6 +612,12 @@ onBeforeUnmount(() => {
             <span>{{ app.user?.userName ?? '匿名用户' }}</span>
           </div>
         </div>
+        <div v-if="codeGenTypeMeta" class="detail-item">
+          <span class="detail-label">生成类型</span>
+          <span class="detail-value">
+            <a-tag :color="codeGenTypeMeta.color">{{ codeGenTypeMeta.label }}</a-tag>
+          </span>
+        </div>
         <div class="detail-item">
           <span class="detail-label">创建时间</span>
           <span class="detail-value">{{ formatDateTime(app.createTime) }}</span>
@@ -644,8 +718,14 @@ onBeforeUnmount(() => {
   font-weight: 500;
 }
 
-.app-name {
+.app-name-row {
   margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-name {
   font-family: var(--font-display);
   font-size: 18px;
   font-weight: 500;
@@ -655,6 +735,13 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 40vw;
+}
+
+.app-type-tag {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
 }
 
 .chat-body {

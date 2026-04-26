@@ -5,6 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.yiming.aiagentproject.ai.AiCodeGenTypeRoutingService;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.annotation.AuthCheck;
 import com.yiming.aiagentproject.common.BaseResponse;
@@ -13,14 +14,18 @@ import com.yiming.aiagentproject.common.ResultUtils;
 import com.yiming.aiagentproject.constant.AppConstant;
 import com.yiming.aiagentproject.constant.UserConstant;
 import com.yiming.aiagentproject.dto.app.*;
+import com.yiming.aiagentproject.exception.BusinessException;
 import com.yiming.aiagentproject.exception.ErrorCode;
 import com.yiming.aiagentproject.exception.ThrowUtils;
 import com.yiming.aiagentproject.model.entity.App;
 import com.yiming.aiagentproject.model.entity.User;
 import com.yiming.aiagentproject.service.AppService;
+import com.yiming.aiagentproject.service.ProjectDownloadService;
 import com.yiming.aiagentproject.service.UserService;
 import com.yiming.aiagentproject.vo.AppVO;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
@@ -29,11 +34,13 @@ import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.time.LocalDateTime;
 import java.util.Map;
 
 /**
  * 应用 控制层。
+ *
  *
  * @author yiming
  */
@@ -46,29 +53,57 @@ public class AppController {
 
     @Autowired
     private UserService userService;
+    @Resource
+    private ProjectDownloadService projectDownloadService;
+    @Resource
+    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
 
 
     // region 用户功能
 
     /**
-     * 创建应用
+     * 下载应用代码
+     *
+     * @param appId    应用ID
+     * @param request  请求
+     * @param response 响应
      */
+    @GetMapping("/download/{appId}")
+    public void downloadAppCode(@PathVariable Long appId,
+                                HttpServletRequest request,
+                                HttpServletResponse response) {
+        // 1. 基础校验
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID无效");
+        // 2. 查询应用信息
+        App app = appService.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        // 3. 权限校验：只有应用创建者可以下载代码
+        User loginUser = userService.getLoginUser(request);
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限下载该应用代码");
+        }
+        // 4. 构建应用代码目录路径（生成目录，非部署目录）
+        String codeGenType = app.getCodeGenType();
+        String sourceDirName = codeGenType + "_" + appId;
+        String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
+        // 5. 检查代码目录是否存在
+        File sourceDir = new File(sourceDirPath);
+        ThrowUtils.throwIf(!sourceDir.exists() || !sourceDir.isDirectory(),
+                ErrorCode.NOT_FOUND_ERROR, "应用代码不存在，请先生成代码");
+        // 6. 生成下载文件名（不建议添加中文内容）
+        String downloadFileName = String.valueOf(appId);
+        // 7. 调用通用下载服务
+        projectDownloadService.downloadProjectAsZip(sourceDirPath, downloadFileName, response);
+    }
+
+
     @PostMapping("/add")
     public BaseResponse<Long> addApp(@RequestBody AppAddDto appAddDto, HttpServletRequest request) {
         ThrowUtils.throwIf(appAddDto == null, ErrorCode.PARAMS_ERROR);
-        String initPrompt = appAddDto.getInitPrompt();
-        ThrowUtils.throwIf(initPrompt == null || initPrompt.isBlank(), ErrorCode.PARAMS_ERROR, "初始化 prompt 不能为空");
+        // 获取当前登录用户
         User loginUser = userService.getLoginUser(request);
-        App app = new App();
-        BeanUtils.copyProperties(appAddDto,app);
-
-        app.setUserId(loginUser.getId());
-        // 默认使用 initPrompt 前 12 个字作为应用名
-        app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
-        app.setCodeGenType(CodeGenTypeEnum.VUE_PROJECT.getValue());
-        boolean result = appService.save(app);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        return ResultUtils.success(app.getId());
+        Long appId = appService.createApp(appAddDto, loginUser);
+        return ResultUtils.success(appId);
     }
 
     /**
