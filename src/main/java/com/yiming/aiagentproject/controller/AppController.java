@@ -206,6 +206,8 @@ public class AppController {
         ThrowUtils.throwIf(appQueryDto == null, ErrorCode.PARAMS_ERROR);
         long pageNum = appQueryDto.getPageNum();
         long pageSize = appQueryDto.getPageSize();
+        appQueryDto.setSortField("createTime");
+        appQueryDto.setSortOrder("descend");
         Page<App> appPage = appService.page(Page.of(pageNum, pageSize),
                 appService.getQueryWrapper(appQueryDto));
         Page<AppVO> appVOPage = new Page<>(pageNum, pageSize, appPage.getTotalRow());

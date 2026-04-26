@@ -203,7 +203,7 @@ const sendMessage = (text: string) => {
   stoppedByUser = false
   scrollToBottom()
 
-  const url = `http://localhost:8123/api/app/chat/gen/code?appId=${appId.value}&message=${encodeURIComponent(content)}`
+  const url = `/api/app/chat/gen/code?appId=${appId.value}&message=${encodeURIComponent(content)}`
   closeEventSource()
   eventSource = new EventSource(url, { withCredentials: true })
 

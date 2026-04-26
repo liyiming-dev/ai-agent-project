@@ -1,10 +1,9 @@
 langchain4j:
   open-ai:
     chat-model:
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api-key: ${DASHSCOPE_API_KEY}
-      model-name: qwen3.5-plus  # qwen-flash3、qwen-plus、qwen-max 等
-      temperature: 0.4
+      base-url: https://api.deepseek.com
+      api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
+      model-name: deepseek-v4-flash
       max-tokens: 64000
       log-requests: true      # 开启请求日志
       log-responses: true
@@ -12,12 +11,21 @@ langchain4j:
       response-format: json_object
       max-retries : 3
     streaming-chat-model:
-      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
-      api-key: ${DASHSCOPE_API_KEY}
-      model-name: qwen3.5-plus
+      base-url: https://api.deepseek.com
+      api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
+      model-name: deepseek-v4-flash
       max-tokens: 64000
       log-requests: true
       log-responses: true
+    # 推理模型（Vue 项目生成使用，启用 thinking 模式）
+    reasoning-streaming-chat-model:
+      base-url: https://api.deepseek.com
+      api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
+      model-name: deepseek-v4-flash
+      max-tokens: 32768
+      log-requests: true
+      log-responses: true
+
 
 
 logging:

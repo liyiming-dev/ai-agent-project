@@ -30,11 +30,13 @@ public class AiCodeGeneratorServiceFactory {
     private StreamingChatModel streamingChatModel;
 
     @Resource
+    private StreamingChatModel reasoningStreamingChatModel;
+
+    @Resource
     private RedisChatMemoryStore redisChatMemoryStore;
     @Resource
     private ChatHistoryService chatHistoryService;
-    @Resource
-    private StreamingChatModel reasoningStreamingChatModel;
+
     /**
      * AI 服务实例缓存
      * 缓存策略：
@@ -87,7 +89,7 @@ public class AiCodeGeneratorServiceFactory {
         return switch (codeGenType) {
             // Vue 项目生成使用推理模型
             case VUE_PROJECT -> AiServices.builder(AiCodeGeneratorService.class)
-                    .streamingChatModel(streamingChatModel)
+                    .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
                     .tools(new FileWriteTool())
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(

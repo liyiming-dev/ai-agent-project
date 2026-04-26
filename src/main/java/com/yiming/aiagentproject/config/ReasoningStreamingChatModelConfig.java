@@ -8,7 +8,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@ConfigurationProperties(prefix = "langchain4j.open-ai.chat-model")
+@ConfigurationProperties(prefix = "langchain4j.open-ai.reasoning-streaming-chat-model")
 @Data
 public class ReasoningStreamingChatModelConfig {
 
@@ -16,24 +16,32 @@ public class ReasoningStreamingChatModelConfig {
 
     private String apiKey;
 
+    private String modelName;
+
+    private Integer maxTokens = 32768;
+
+    private Boolean logRequests = false;
+
+    private Boolean logResponses = false;
+
     /**
      * 推理流式模型（用于 Vue 项目生成，带工具调用）
+     * 开启 returnThinking / sendThinking：
+     *  - returnThinking=true  解析响应中的 reasoning_content 并保存到 AiMessage
+     *  - sendThinking=true    多轮对话时把历史 AiMessage 的 reasoning_content 回传
+     *    修复 "The `reasoning_content` in the thinking mode must be passed back to the API." 报错
      */
     @Bean
     public StreamingChatModel reasoningStreamingChatModel() {
-        // 为了测试方便临时修改
-        final String modelName = "deepseek-chat";
-        final int maxTokens = 8192;
-        // 生产环境使用：
-        // final String modelName = "deepseek-reasoner";
-        // final int maxTokens = 32768;
         return OpenAiStreamingChatModel.builder()
                 .apiKey(apiKey)
                 .baseUrl(baseUrl)
                 .modelName(modelName)
                 .maxTokens(maxTokens)
-                .logRequests(true)
-                .logResponses(true)
+                .logRequests(logRequests)
+                .logResponses(logResponses)
+                .returnThinking(true)
+                .sendThinking(true)
                 .build();
     }
 }
