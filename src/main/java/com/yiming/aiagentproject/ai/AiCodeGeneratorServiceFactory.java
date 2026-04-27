@@ -3,7 +3,7 @@ package com.yiming.aiagentproject.ai;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
-import com.yiming.aiagentproject.ai.tools.FileWriteTool;
+import com.yiming.aiagentproject.ai.tools.*;
 import com.yiming.aiagentproject.exception.BusinessException;
 import com.yiming.aiagentproject.exception.ErrorCode;
 import com.yiming.aiagentproject.service.ChatHistoryService;
@@ -36,6 +36,8 @@ public class AiCodeGeneratorServiceFactory {
     private RedisChatMemoryStore redisChatMemoryStore;
     @Resource
     private ChatHistoryService chatHistoryService;
+    @Resource
+    private ToolManager toolManager;
 
     /**
      * AI 服务实例缓存
@@ -91,7 +93,7 @@ public class AiCodeGeneratorServiceFactory {
             case VUE_PROJECT -> AiServices.builder(AiCodeGeneratorService.class)
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
-                    .tools(new FileWriteTool())
+                    .tools(toolManager.getAllTools())
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                     ))
