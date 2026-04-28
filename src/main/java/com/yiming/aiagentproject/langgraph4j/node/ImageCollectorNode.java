@@ -22,6 +22,9 @@ import java.util.concurrent.CompletableFuture;
 
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
+/**
+ * 图片收集节点
+ */
 @Slf4j
 public class ImageCollectorNode {
 

@@ -1,6 +1,7 @@
 package com.yiming.aiagentproject.langgraph4j.state;
 
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
+import com.yiming.aiagentproject.langgraph4j.model.ImageCollectionPlan;
 import com.yiming.aiagentproject.langgraph4j.model.ImageResource;
 import com.yiming.aiagentproject.langgraph4j.model.QualityResult;
 import lombok.AllArgsConstructor;
@@ -27,6 +28,16 @@ public class WorkflowContext implements Serializable {
      * WorkflowContext 在 MessagesState 中的存储key
      */
     public static final String WORKFLOW_CONTEXT_KEY = "workflowContext";
+
+    /**
+     * 并发图片收集分支在 MessagesState 中各自独立的存储 key，
+     * 避免多个并行节点同时写同一个 WorkflowContext 实例引发竞态。
+     * 由 ImageAggregatorNode 在汇聚阶段读取并合并到 WorkflowContext.imageList。
+     */
+    public static final String CONTENT_IMAGES_KEY = "contentImages";
+    public static final String ILLUSTRATIONS_KEY = "illustrations";
+    public static final String DIAGRAMS_KEY = "diagrams";
+    public static final String LOGOS_KEY = "logos";
 
     /**
      * 当前执行步骤
@@ -76,6 +87,11 @@ public class WorkflowContext implements Serializable {
      * 质量检查结果
      */
     private QualityResult qualityResult;
+
+    /**
+     * 图片收集计划
+     */
+    private ImageCollectionPlan imageCollectionPlan;
 
 
     @Serial

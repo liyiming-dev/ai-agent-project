@@ -10,6 +10,9 @@ import org.bsc.langgraph4j.prebuilt.MessagesState;
 
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
+/**
+ * 智能路由节点，根据原始提示词智能选择代码生成类型（HTML、Vue等）
+ */
 @Slf4j
 public class RouterNode {
 

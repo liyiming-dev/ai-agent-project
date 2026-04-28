@@ -14,6 +14,9 @@ import java.io.File;
 
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
+/**
+ * 项目构建节点
+ */
 @Slf4j
 public class ProjectBuilderNode {
 

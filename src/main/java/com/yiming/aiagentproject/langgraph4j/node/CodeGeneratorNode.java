@@ -15,6 +15,9 @@ import java.time.Duration;
 
 import static org.bsc.langgraph4j.action.AsyncNodeAction.node_async;
 
+/**
+ * 代码生成节点
+ */
 @Slf4j
 public class CodeGeneratorNode {
 
