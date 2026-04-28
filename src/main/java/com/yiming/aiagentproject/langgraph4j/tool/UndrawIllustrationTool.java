@@ -20,6 +20,9 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+/**
+ * 搜索插画图片工具
+ */
 @Slf4j
 @Component
 public class UndrawIllustrationTool {

@@ -17,6 +17,9 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * 搜索内容图片工具
+ */
 @Slf4j
 @Component
 public class ImageSearchTool {
