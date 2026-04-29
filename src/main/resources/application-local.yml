@@ -22,7 +22,7 @@ langchain4j:
       base-url: https://api.deepseek.com
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
       model-name: deepseek-v4-flash
-      max-tokens: 32768
+      max-tokens: 64000
       log-requests: true
       log-responses: true
 # Pexels 图片搜索配置

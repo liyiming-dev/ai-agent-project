@@ -17,6 +17,11 @@ type ChatMessage = {
   createTime?: string
 }
 
+type SseBusinessError = {
+  code?: number
+  message?: string
+}
+
 const escapeHtml = (text: string): string =>
   text
     .replace(/&/g, '&amp;')
@@ -88,6 +93,7 @@ const previewIframeRef = ref<HTMLIFrameElement | null>(null)
 let eventSource: EventSource | null = null
 let doneReceived = false
 let stoppedByUser = false
+let businessErrorReceived = false
 
 // 可视化编辑模式
 const {
@@ -131,6 +137,16 @@ const closeEventSource = () => {
   if (eventSource) {
     eventSource.close()
     eventSource = null
+  }
+}
+
+const parseSseBusinessError = (raw: string): string => {
+  if (!raw) return '请求过于频繁，请稍后再试'
+  try {
+    const parsed = JSON.parse(raw) as SseBusinessError
+    return parsed.message || '请求过于频繁，请稍后再试'
+  } catch {
+    return raw
   }
 }
 
@@ -189,7 +205,7 @@ const loadChatHistory = async (isLoadMore = false) => {
 
       // 更新游标：取当前列表中最早那条消息的 createTime
       if (messages.value.length > 0) {
-        oldestCreateTime.value = messages.value[0].createTime
+        oldestCreateTime.value = messages.value[0]?.createTime
       }
 
       // 判断是否还有更多
@@ -228,6 +244,7 @@ const sendMessage = (text: string) => {
   previewReady.value = false
   doneReceived = false
   stoppedByUser = false
+  businessErrorReceived = false
   scrollToBottom()
 
   const url = `/api/app/chat/gen/code?appId=${appId.value}&message=${encodeURIComponent(content)}`
@@ -262,6 +279,8 @@ const sendMessage = (text: string) => {
     aiMsg.loading = false
     if (doneReceived) {
       void finishSuccess()
+    } else if (businessErrorReceived) {
+      // 已由服务端业务错误事件处理
     } else if (stoppedByUser) {
       aiMsg.content = aiMsg.content
         ? `${aiMsg.content}\n\n（已手动中断生成）`
@@ -277,6 +296,17 @@ const sendMessage = (text: string) => {
   eventSource.addEventListener('done', () => {
     doneReceived = true
     void finishSuccess()
+  })
+
+  eventSource.addEventListener('business-error', (event) => {
+    businessErrorReceived = true
+    closeEventSource()
+    sending.value = false
+    aiMsg.loading = false
+    const errorMessage = parseSseBusinessError(event.data)
+    aiMsg.content = errorMessage
+    message.error(errorMessage)
+    scrollToBottom()
   })
 }
 

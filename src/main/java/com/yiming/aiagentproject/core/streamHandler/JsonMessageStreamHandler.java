@@ -65,7 +65,9 @@ public class JsonMessageStreamHandler {
                     // AI 生成完毕：先落库聊天历史，再同步执行 Vue 构建，最后才让流 complete
                     // 这样 Controller 在 Flux 结束后补发的 done 事件到达前端时，dist/ 已就绪
                     String aiResponse = chatHistoryStringBuilder.toString();
+
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
+                    //异步构建 Vue项目
                     String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
                     return Flux.concat(
                             Flux.just("\n\n[构建 Vue 项目] 正在执行 npm install 和 npm run build，请稍候...\n\n"),

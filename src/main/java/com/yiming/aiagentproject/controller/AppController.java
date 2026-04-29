@@ -6,7 +6,6 @@ import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.yiming.aiagentproject.ai.AiCodeGenTypeRoutingService;
-import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.annotation.AuthCheck;
 import com.yiming.aiagentproject.common.BaseResponse;
 import com.yiming.aiagentproject.common.DeleteRequest;
@@ -19,6 +18,8 @@ import com.yiming.aiagentproject.exception.ErrorCode;
 import com.yiming.aiagentproject.exception.ThrowUtils;
 import com.yiming.aiagentproject.model.entity.App;
 import com.yiming.aiagentproject.model.entity.User;
+import com.yiming.aiagentproject.rateLimiter.annotation.RateLimit;
+import com.yiming.aiagentproject.rateLimiter.enums.RateLimitType;
 import com.yiming.aiagentproject.service.AppService;
 import com.yiming.aiagentproject.service.ProjectDownloadService;
 import com.yiming.aiagentproject.service.UserService;
@@ -26,8 +27,8 @@ import com.yiming.aiagentproject.vo.AppVO;
 import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.ServerSentEvent;
 import org.springframework.web.bind.annotation.*;
@@ -183,6 +184,11 @@ public class AppController {
      * 分页查询精选应用列表（按优先级，支持按名称查询，每页最多 20 个）
      */
     @PostMapping("/good/list/page/vo")
+    @Cacheable(
+            value = "good_app_page",
+            key = "T(com.yiming.aiagentproject.utils.CacheKeyUtils).generateKey(#appQueryDto)",
+            condition = "#appQueryDto.pageNum <= 10"
+    )
     public BaseResponse<Page<AppVO>> listGoodAppVOByPage(@RequestBody AppQueryDto appQueryDto) {
         ThrowUtils.throwIf(appQueryDto == null, ErrorCode.PARAMS_ERROR);
         ThrowUtils.throwIf(appQueryDto.getPageSize() > 20, ErrorCode.PARAMS_ERROR, "每页最多 20 个");
@@ -271,6 +277,7 @@ public class AppController {
      * @return 生成结果流
      */
     @GetMapping(value = "/chat/gen/code", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @RateLimit(limitType = RateLimitType.USER, rate = 5, rateInterval = 60, message = "AI请求过于频繁,请稍后再试")
     public Flux<ServerSentEvent<String>> chatToGenCode(@RequestParam Long appId,
                                                        @RequestParam String message,
                                                        HttpServletRequest request) {
