@@ -2,8 +2,9 @@ package com.yiming.aiagentproject.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.yiming.aiagentproject.ai.guardrail.PromptSafetyInputGuardrail;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
-import com.yiming.aiagentproject.ai.tools.*;
+import com.yiming.aiagentproject.ai.tools.ToolManager;
 import com.yiming.aiagentproject.exception.BusinessException;
 import com.yiming.aiagentproject.exception.ErrorCode;
 import com.yiming.aiagentproject.service.ChatHistoryService;
@@ -94,14 +95,19 @@ public class AiCodeGeneratorServiceFactory {
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
                     .tools(toolManager.getAllTools())
+                    .inputGuardrails(new PromptSafetyInputGuardrail())
+//                  .outputGuardrails(new RetryOutputGuardrail()) 开启后将无法流式输出
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                     ))
+                    .maxSequentialToolsInvocations(30) //最多一次回答调用30次工具,避免无限循环
                     .build();
             // HTML 和多文件生成使用默认模型
             case HTML, MULTI_FILE -> AiServices.builder(AiCodeGeneratorService.class)
                     .chatModel(chatModel)
                     .streamingChatModel(streamingChatModel)
+                    .inputGuardrails(new PromptSafetyInputGuardrail())
+//                  .outputGuardrails(new RetryOutputGuardrail()) 开启后将无法流式输出
                     .chatMemory(chatMemory)
                     .build();
             default -> throw new BusinessException(ErrorCode.SYSTEM_ERROR,
