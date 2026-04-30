@@ -3,6 +3,7 @@ package com.yiming.aiagentproject.ai.imagecollection;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.StopWatch;
 import com.yiming.aiagentproject.langgraph4j.ai.ImageCollectionPlanService;
+import com.yiming.aiagentproject.langgraph4j.enums.ImageCategoryEnum;
 import com.yiming.aiagentproject.langgraph4j.model.ImageCollectionPlan;
 import com.yiming.aiagentproject.langgraph4j.model.ImageResource;
 import com.yiming.aiagentproject.langgraph4j.tool.ImageSearchTool;
@@ -15,7 +16,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.stream.Collectors;
 
 /**
  * 图片收集编排器：在原有架构（非 langgraph4j 工作流）下，
@@ -110,19 +113,42 @@ public class ImageCollectionOrchestrator {
         builder.append(originalPrompt);
         if (CollUtil.isNotEmpty(imageList)) {
             builder.append("\n\n## 可用素材资源\n");
-            builder.append("请在生成网站使用以下图片资源，将这些图片合理地嵌入到网站的相应位置中。\n");
-            for (ImageResource image : imageList) {
+            builder.append("以下素材按类别分组，请严格按各分组的使用规则嵌入；不符合规则的素材不要使用。\n");
+            appendImagesByCategory(builder, imageList);
+        }
+        String enhanced = builder.toString();
+        log.info("提示词增强完成，增强后长度: {} 字符", enhanced.length());
+        return enhanced;
+    }
+
+    private static void appendImagesByCategory(StringBuilder builder, List<ImageResource> imageList) {
+        Map<ImageCategoryEnum, List<ImageResource>> grouped = imageList.stream()
+                .filter(img -> img.getCategory() != null)
+                .collect(Collectors.groupingBy(ImageResource::getCategory));
+        for (ImageCategoryEnum category : ImageCategoryEnum.values()) {
+            List<ImageResource> images = grouped.get(category);
+            if (CollUtil.isEmpty(images)) {
+                continue;
+            }
+            builder.append("\n### ").append(category.getText()).append("\n");
+            builder.append(usageRuleOf(category)).append("\n");
+            for (ImageResource image : images) {
                 builder.append("- ")
-                        .append(image.getCategory().getText())
-                        .append("：")
                         .append(image.getDescription())
                         .append("（")
                         .append(image.getUrl())
                         .append("）\n");
             }
         }
-        String enhanced = builder.toString();
-        log.info("提示词增强完成，增强后长度: {} 字符", enhanced.length());
-        return enhanced;
+    }
+
+    private static String usageRuleOf(ImageCategoryEnum category) {
+        return switch (category) {
+            case CONTENT -> "用途：网站正文配图，可在卡片、列表、详情等内容区域使用。";
+            case ILLUSTRATION -> "用途：装饰性插画，用于空状态、特性介绍等装饰位置。";
+            case LOGO -> "用途：品牌标识，仅用于导航栏 / 页脚 / 关于页等品牌展示位。";
+            case ARCHITECTURE -> "用途：仅当页面存在专门的「技术架构 / 工作原理 / 业务流程」等说明性区块时使用；"
+                    + "禁止放入首页 Hero、Banner、导航栏、通用卡片或纯装饰位；若全站没有合适位置，请直接忽略本组素材。";
+        };
     }
 }

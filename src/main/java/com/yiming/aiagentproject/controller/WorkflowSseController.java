@@ -1,5 +1,6 @@
 package com.yiming.aiagentproject.controller;
 
+import com.yiming.aiagentproject.ai.guardrail.PromptSafetyInputGuardrail;
 import com.yiming.aiagentproject.langgraph4j.CodeGenWorkflow;
 import com.yiming.aiagentproject.langgraph4j.state.WorkflowContext;
 import lombok.extern.slf4j.Slf4j;
@@ -23,6 +24,7 @@ public class WorkflowSseController {
     @PostMapping("/execute")
     public WorkflowContext executeWorkflow(@RequestParam String prompt) {
         log.info("收到同步工作流执行请求: {}", prompt);
+        PromptSafetyInputGuardrail.validateRawUserPrompt(prompt);
         return new CodeGenWorkflow().executeWorkflow(prompt);
     }
 
@@ -32,6 +34,7 @@ public class WorkflowSseController {
     @GetMapping(value = "/execute-flux", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public Flux<ServerSentEvent<String>> executeWorkflowWithFlux(@RequestParam String prompt) {
         log.info("收到 Flux 工作流执行请求: {}", prompt);
+        PromptSafetyInputGuardrail.validateRawUserPrompt(prompt);
         return new CodeGenWorkflow().executeWorkflowWithFlux(prompt);
     }
 }

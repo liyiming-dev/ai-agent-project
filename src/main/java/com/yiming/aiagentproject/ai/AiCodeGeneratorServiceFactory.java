@@ -2,7 +2,6 @@ package com.yiming.aiagentproject.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
-import com.yiming.aiagentproject.ai.guardrail.PromptSafetyInputGuardrail;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.ai.tools.ToolManager;
 import com.yiming.aiagentproject.exception.BusinessException;
@@ -95,7 +94,7 @@ public class AiCodeGeneratorServiceFactory {
                     .streamingChatModel(reasoningStreamingChatModel)
                     .chatMemoryProvider(memoryId -> chatMemory)
                     .tools(toolManager.getAllTools())
-                    .inputGuardrails(new PromptSafetyInputGuardrail())
+                    // 安全校验在入口对用户原始输入执行，避免误判已增强的提示词
 //                  .outputGuardrails(new RetryOutputGuardrail()) 开启后将无法流式输出
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
@@ -106,7 +105,6 @@ public class AiCodeGeneratorServiceFactory {
             case HTML, MULTI_FILE -> AiServices.builder(AiCodeGeneratorService.class)
                     .chatModel(chatModel)
                     .streamingChatModel(streamingChatModel)
-                    .inputGuardrails(new PromptSafetyInputGuardrail())
 //                  .outputGuardrails(new RetryOutputGuardrail()) 开启后将无法流式输出
                     .chatMemory(chatMemory)
                     .build();

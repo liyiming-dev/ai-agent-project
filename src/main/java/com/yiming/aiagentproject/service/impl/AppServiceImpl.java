@@ -8,6 +8,7 @@ import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
 import com.yiming.aiagentproject.ai.CodeGenTypeResolver;
+import com.yiming.aiagentproject.ai.guardrail.PromptSafetyInputGuardrail;
 import com.yiming.aiagentproject.ai.model.enums.ChatHistoryMessageTypeEnum;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.constant.AppConstant;
@@ -168,6 +169,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 1. 参数校验
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
         ThrowUtils.throwIf(StrUtil.isBlank(message), ErrorCode.PARAMS_ERROR, "用户消息不能为空");
+        // 1.1 对用户原始输入做安全校验（敏感词、注入模式、长度上限）
+        PromptSafetyInputGuardrail.validateRawUserPrompt(message);
         // 2. 查询应用信息
         App app = this.getById(appId);
         ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
