@@ -25,6 +25,19 @@ langchain4j:
       max-tokens: 64000
       log-requests: true
       log-responses: true
+    # 路由判断模型（仅用于代码生成类型路由判断，可使用更轻量/便宜的模型）
+    routing-chat-model:
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      api-key: sk-565e5cf98fa94bc98242dfe3876e0c45
+      model-name: qwen-turbo
+      temperature: 0.0
+      max-tokens: 4096
+      max-retries: 3
+      log-requests: true
+      log-responses: true
+      response-format: json_object
+
+
 # Pexels 图片搜索配置
 pexels:
   api-key: zFXnEpqAdJv53a9vsIuy2YLo7INm7VaK2v3UpZ4KiqGbq8B0vAt8rPHx
