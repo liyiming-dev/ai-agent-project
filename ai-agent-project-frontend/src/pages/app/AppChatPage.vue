@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, h, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import MarkdownIt from 'markdown-it'
@@ -51,7 +51,9 @@ const route = useRoute()
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
 
+const PENDING_APP_ID = 'pending'
 const appId = computed(() => route.params.id as string)
+const isPendingApp = computed(() => appId.value === PENDING_APP_ID)
 
 const app = ref<API.AppVO | null>(null)
 const messages = ref<ChatMessage[]>([])
@@ -72,8 +74,14 @@ const oldestCreateTime = ref<string | undefined>(undefined)
 const totalHistoryCount = ref(0)
 
 const isOwner = computed(() => {
+  if (isPendingApp.value) return false
   const myId = loginUserStore.loginUser.id
   return !!(myId && app.value?.userId && app.value.userId === myId)
+})
+
+const appNameText = computed(() => {
+  if (isPendingApp.value) return '正在创建应用...'
+  return app.value?.appName || '加载中...'
 })
 
 const CODE_GEN_TYPE_META: Record<string, { label: string; color: string }> = {
@@ -83,8 +91,9 @@ const CODE_GEN_TYPE_META: Record<string, { label: string; color: string }> = {
 }
 
 const codeGenTypeMeta = computed(() => {
-  const key = app.value?.codeGenType
-  if (!key) return null
+  if (!app.value || isPendingApp.value) return null
+  const key = app.value.codeGenType
+  if (!key) return { label: 'AI 识别中', color: 'default' }
   return CODE_GEN_TYPE_META[key] ?? { label: key, color: 'default' }
 })
 
@@ -94,6 +103,7 @@ let eventSource: EventSource | null = null
 let doneReceived = false
 let stoppedByUser = false
 let businessErrorReceived = false
+let codeGenTypeRefreshed = false
 
 // 可视化编辑模式
 const {
@@ -150,6 +160,42 @@ const parseSseBusinessError = (raw: string): string => {
   }
 }
 
+const resetPageState = () => {
+  closeEventSource()
+  app.value = null
+  messages.value = []
+  inputMessage.value = ''
+  sending.value = false
+  deploying.value = false
+  downloading.value = false
+  previewReady.value = false
+  previewVersion.value = 0
+  initialSent.value = false
+  detailVisible.value = false
+  deleting.value = false
+  historyLoading.value = false
+  hasMoreHistory.value = false
+  oldestCreateTime.value = undefined
+  totalHistoryCount.value = 0
+  doneReceived = false
+  stoppedByUser = false
+  businessErrorReceived = false
+  codeGenTypeRefreshed = false
+  disableEdit()
+  clearSelection()
+}
+
+const initPage = async () => {
+  resetPageState()
+  if (isPendingApp.value) {
+    return
+  }
+  // 先加载对话历史
+  await loadChatHistory(false)
+  // 再获取应用信息（会触发 watch 来决定是否自动发送初始消息）
+  await fetchApp()
+}
+
 /**
  * 将后端 ChatHistory 记录转换为前端 ChatMessage
  */
@@ -166,7 +212,7 @@ const chatHistoryToMessage = (record: API.ChatHistory): ChatMessage => {
  * 首次加载传空 lastCreateTime，之后传最早一条记录的 createTime
  */
 const loadChatHistory = async (isLoadMore = false) => {
-  if (!appId.value) return
+  if (!appId.value || isPendingApp.value) return
   historyLoading.value = true
   try {
     const params: API.listAppChatHistoryParams = {
@@ -235,7 +281,7 @@ const sendMessage = (text: string) => {
     message.warning('AI 正在回复，请稍候')
     return
   }
-  if (!appId.value) return
+  if (!appId.value || isPendingApp.value) return
 
   messages.value.push({ role: 'user', content })
   messages.value.push({ role: 'ai', content: '', loading: true })
@@ -245,6 +291,7 @@ const sendMessage = (text: string) => {
   doneReceived = false
   stoppedByUser = false
   businessErrorReceived = false
+  codeGenTypeRefreshed = false
   scrollToBottom()
 
   const url = `/api/app/chat/gen/code?appId=${appId.value}&message=${encodeURIComponent(content)}`
@@ -270,6 +317,10 @@ const sendMessage = (text: string) => {
       aiMsg.content += event.data
     }
     aiMsg.loading = false
+    if (!codeGenTypeRefreshed && !app.value?.codeGenType) {
+      codeGenTypeRefreshed = true
+      void fetchApp()
+    }
     scrollToBottom()
   }
 
@@ -311,6 +362,7 @@ const sendMessage = (text: string) => {
 }
 
 const handleSend = () => {
+  if (isPendingApp.value) return
   const text = inputMessage.value.trim()
   if (!text) return
   // 如有可视化选中的元素，将其信息追加到提示词后一并发送给后端
@@ -347,7 +399,7 @@ const handleInputKeydown = (e: KeyboardEvent) => {
 }
 
 const fetchApp = async () => {
-  if (!appId.value) return
+  if (!appId.value || isPendingApp.value) return false
   try {
     const res = await getAppVoById({ id: appId.value as unknown as number })
     if (res.data.code === 0 && res.data.data) {
@@ -366,7 +418,7 @@ const refreshPreview = () => {
 }
 
 const handleDownload = async () => {
-  if (!appId.value) return
+  if (!appId.value || isPendingApp.value) return
   downloading.value = true
   try {
     const res = await downloadAppCode(
@@ -405,7 +457,7 @@ const handleDownload = async () => {
 }
 
 const handleDeploy = async () => {
-  if (!appId.value) return
+  if (!appId.value || isPendingApp.value) return
   deploying.value = true
   try {
     const res = await deployApp({ appId: appId.value as unknown as number })
@@ -475,7 +527,7 @@ const handleDeleteApp = () => {
 watch(
   () => app.value,
   (val) => {
-    if (!val || initialSent.value) return
+    if (!val || initialSent.value || isPendingApp.value) return
     initialSent.value = true
 
     // 如果是 owner，没有历史消息，且有 initPrompt → 自动发送
@@ -490,12 +542,13 @@ watch(
   },
 )
 
-onMounted(async () => {
-  // 先加载对话历史
-  await loadChatHistory(false)
-  // 再获取应用信息（会触发 watch 来决定是否自动发送初始消息）
-  await fetchApp()
-})
+watch(
+  () => appId.value,
+  () => {
+    void initPage()
+  },
+  { immediate: true },
+)
 
 onBeforeUnmount(() => {
   closeEventSource()
@@ -512,7 +565,7 @@ onBeforeUnmount(() => {
         <div class="app-title-group">
           <span class="app-kicker">Workspace</span>
           <div class="app-name-row">
-            <span class="app-name">{{ app?.appName || '加载中...' }}</span>
+            <span class="app-name">{{ appNameText }}</span>
             <a-tag
               v-if="codeGenTypeMeta"
               :color="codeGenTypeMeta.color"
@@ -524,10 +577,10 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <a-space :size="10">
-        <a-button :disabled="!app" @click="openDetail">应用详情</a-button>
+        <a-button :disabled="isPendingApp || !app" @click="openDetail">应用详情</a-button>
         <a-button
           :loading="downloading"
-          :disabled="!isOwner"
+          :disabled="isPendingApp || !isOwner"
           @click="handleDownload"
         >
           下载代码
@@ -535,7 +588,7 @@ onBeforeUnmount(() => {
         <a-button
           type="primary"
           :loading="deploying"
-          :disabled="!isOwner"
+          :disabled="isPendingApp || !isOwner"
           @click="handleDeploy"
         >
           部署
@@ -551,7 +604,7 @@ onBeforeUnmount(() => {
         </div>
         <div ref="messagesRef" class="messages">
           <!-- 加载更多按钮 -->
-          <div v-if="hasMoreHistory" class="load-more-wrap">
+          <div v-if="!isPendingApp && hasMoreHistory" class="load-more-wrap">
             <a-button
               type="link"
               size="small"
@@ -562,24 +615,30 @@ onBeforeUnmount(() => {
               {{ historyLoading ? '加载中...' : '↑ 加载更多历史消息' }}
             </a-button>
           </div>
-          <div
-            v-for="(msg, idx) in messages"
-            :key="idx"
-            class="message"
-            :class="msg.role === 'user' ? 'message-user' : 'message-ai'"
-          >
-            <div class="message-content">
-              <a-spin v-if="msg.loading && !msg.content" size="small" />
-              <template v-else>
-                <div
-                  v-if="msg.role === 'ai'"
-                  class="markdown-body"
-                  v-html="renderMarkdown(msg.content)"
-                ></div>
-                <template v-else>{{ msg.content }}</template>
-              </template>
-            </div>
+          <div v-if="isPendingApp" class="pending-chat-state">
+            <a-spin size="small" />
+            <span>正在创建会话，马上进入工作区...</span>
           </div>
+          <template v-else>
+            <div
+              v-for="(msg, idx) in messages"
+              :key="idx"
+              class="message"
+              :class="msg.role === 'user' ? 'message-user' : 'message-ai'"
+            >
+              <div class="message-content">
+                <a-spin v-if="msg.loading && !msg.content" size="small" />
+                <template v-else>
+                  <div
+                    v-if="msg.role === 'ai'"
+                    class="markdown-body"
+                    v-html="renderMarkdown(msg.content)"
+                  ></div>
+                  <template v-else>{{ msg.content }}</template>
+                </template>
+              </div>
+            </div>
+          </template>
         </div>
         <div class="input-area">
           <a-alert
@@ -599,9 +658,15 @@ onBeforeUnmount(() => {
             <div class="input-wrap">
               <a-textarea
                 v-model:value="inputMessage"
-                :placeholder="isOwner ? '描述越详细，页面越具体，可以一步一步完善生成效果' : '仅作者可继续对话'"
+                :placeholder="
+                  isPendingApp
+                    ? '正在创建会话...'
+                    : isOwner
+                      ? '描述越详细，页面越具体，可以一步一步完善生成效果'
+                      : '仅作者可继续对话'
+                "
                 :auto-size="{ minRows: 3, maxRows: 6 }"
-                :disabled="sending || !isOwner"
+                :disabled="isPendingApp || sending || !isOwner"
                 @keydown="handleInputKeydown"
               />
             </div>
@@ -616,7 +681,7 @@ onBeforeUnmount(() => {
                 <a-button
                   :type="editMode ? 'primary' : 'default'"
                   :ghost="editMode"
-                  :disabled="!isOwner || !previewReady"
+                  :disabled="isPendingApp || !isOwner || !previewReady"
                   @click="toggleEdit"
                 >
                   {{ editMode ? '退出编辑' : '可视化编辑' }}
@@ -626,7 +691,7 @@ onBeforeUnmount(() => {
               <a-button
                 type="primary"
                 :loading="sending"
-                :disabled="!isOwner"
+                :disabled="isPendingApp || !isOwner"
                 @click="handleSend"
               >
                 发送
@@ -665,7 +730,15 @@ onBeforeUnmount(() => {
         <div v-else class="preview-placeholder">
           <div class="placeholder-inner">
             <span class="placeholder-eyebrow">Preview</span>
-            <a-empty :description="sending ? 'AI 正在生成网站，请稍候...' : '等待生成网站'" />
+            <a-empty
+              :description="
+                isPendingApp
+                  ? '正在创建会话...'
+                  : sending
+                    ? 'AI 正在生成网站，请稍候...'
+                    : '等待生成网站'
+              "
+            />
           </div>
         </div>
       </main>
@@ -890,6 +963,22 @@ onBeforeUnmount(() => {
 
 .load-more-btn:hover {
   color: var(--teal-900);
+}
+
+.pending-chat-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  align-self: flex-start;
+  max-width: 82%;
+  padding: 12px 16px;
+  border: 1px solid rgba(15, 123, 138, 0.08);
+  border-radius: 14px;
+  border-bottom-left-radius: 4px;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--ink-700);
+  font-size: 14px;
+  line-height: 1.65;
 }
 
 .message {

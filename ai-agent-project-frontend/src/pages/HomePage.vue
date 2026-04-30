@@ -136,6 +136,7 @@ const handlePromptKeydown = (e: KeyboardEvent) => {
 }
 
 const handleCreate = async () => {
+  if (creating.value) return
   const prompt = initPrompt.value.trim()
   if (!prompt) {
     message.warning('请输入提示词')
@@ -147,15 +148,20 @@ const handleCreate = async () => {
     return
   }
   creating.value = true
+  const pendingRoute = router.push({ path: '/app/chat/pending', query: { creating: '1' } })
+  const createRequest = addApp({ initPrompt: prompt })
   try {
-    const res = await addApp({ initPrompt: prompt })
+    await pendingRoute
+    const res = await createRequest
     if (res.data.code === 0 && res.data.data) {
-      router.push({ path: `/app/chat/${res.data.data}` })
+      router.replace({ path: `/app/chat/${res.data.data}` })
       return
     }
     message.error(res.data.message ?? '创建应用失败')
+    router.replace('/')
   } catch {
     message.error('创建应用失败')
+    router.replace('/')
   } finally {
     creating.value = false
   }

@@ -5,7 +5,7 @@ import cn.hutool.core.util.StrUtil;
 import cn.hutool.json.JSONUtil;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
-import com.yiming.aiagentproject.ai.AiCodeGenTypeRoutingService;
+import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.annotation.AuthCheck;
 import com.yiming.aiagentproject.common.BaseResponse;
 import com.yiming.aiagentproject.common.DeleteRequest;
@@ -56,8 +56,6 @@ public class AppController {
     private UserService userService;
     @Resource
     private ProjectDownloadService projectDownloadService;
-    @Resource
-    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
 
 
     // region 用户功能
@@ -84,8 +82,9 @@ public class AppController {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限下载该应用代码");
         }
         // 4. 构建应用代码目录路径（生成目录，非部署目录）
-        String codeGenType = app.getCodeGenType();
-        String sourceDirName = codeGenType + "_" + appId;
+        CodeGenTypeEnum codeGenType = CodeGenTypeEnum.getEnumByValue(app.getCodeGenType());
+        ThrowUtils.throwIf(codeGenType == null, ErrorCode.NOT_FOUND_ERROR, "应用代码不存在，请先生成代码");
+        String sourceDirName = codeGenType.getValue() + "_" + appId;
         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
         // 5. 检查代码目录是否存在
         File sourceDir = new File(sourceDirPath);

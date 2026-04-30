@@ -1,6 +1,6 @@
 package com.yiming.aiagentproject.langgraph4j.node;
 
-import com.yiming.aiagentproject.ai.AiCodeGenTypeRoutingService;
+import com.yiming.aiagentproject.ai.CodeGenTypeResolver;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.langgraph4j.state.WorkflowContext;
 import com.yiming.aiagentproject.utils.SpringContextUtil;
@@ -24,9 +24,9 @@ public class RouterNode {
             CodeGenTypeEnum generationType;
             try {
                 // 获取AI路由服务
-                AiCodeGenTypeRoutingService routingService = SpringContextUtil.getBean(AiCodeGenTypeRoutingService.class);
+                CodeGenTypeResolver codeGenTypeResolver = SpringContextUtil.getBean(CodeGenTypeResolver.class);
                 // 根据原始提示词进行智能路由
-                generationType = routingService.routeCodeGenType(context.getOriginalPrompt()).getType();
+                generationType = codeGenTypeResolver.routeOrDefault(context.getOriginalPrompt());
                 log.info("AI智能路由完成，选择类型: {} ({})", generationType.getValue(), generationType.getText());
             } catch (Exception e) {
                 log.error("AI智能路由失败，使用默认HTML类型: {}", e.getMessage());

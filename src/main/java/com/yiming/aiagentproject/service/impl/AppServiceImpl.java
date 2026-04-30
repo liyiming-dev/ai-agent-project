@@ -7,7 +7,7 @@ import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
-import com.yiming.aiagentproject.ai.AiCodeGenTypeRoutingService;
+import com.yiming.aiagentproject.ai.CodeGenTypeResolver;
 import com.yiming.aiagentproject.ai.model.enums.ChatHistoryMessageTypeEnum;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.constant.AppConstant;
@@ -66,7 +66,7 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
     private ScreenshotService screenshotService;
 
     @Resource
-    private AiCodeGenTypeRoutingService aiCodeGenTypeRoutingService;
+    private CodeGenTypeResolver codeGenTypeResolver;
 
     @Override
     public Long createApp(AppAddDto appAddDto, User loginUser) {
@@ -79,13 +79,12 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         app.setUserId(loginUser.getId());
         // 应用名称暂时为 initPrompt 前 12 位
         app.setAppName(initPrompt.substring(0, Math.min(initPrompt.length(), 12)));
-        // 使用 AI 智能选择代码生成类型
-        CodeGenTypeEnum selectedCodeGenType = aiCodeGenTypeRoutingService.routeCodeGenType(initPrompt).getType();
-        app.setCodeGenType(selectedCodeGenType.getValue());
+        // 创建链路不做 AI 路由，先写入空占位，首次生成时再回填真实类型
+        app.setCodeGenType("");
         // 插入数据库
         boolean result = this.save(app);
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        log.info("应用创建成功，ID: {}, 类型: {}", app.getId(), selectedCodeGenType.getValue());
+        log.info("应用创建成功，ID: {}", app.getId());
         return app.getId();
     }
 
@@ -176,12 +175,8 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         if (!app.getUserId().equals(loginUser.getId())) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限访问该应用");
         }
-        // 4. 获取应用的代码生成类型
-        String codeGenTypeStr = app.getCodeGenType();
-        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
-        if (codeGenTypeEnum == null) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
-        }
+        // 4. 获取应用的代码生成类型，首次生成时延迟路由并回填
+        CodeGenTypeEnum codeGenTypeEnum = resolveCodeGenType(app, message);
         // 5. 通过校验后，添加用户消息到对话历史
         chatHistoryService.addChatMessage(appId, message, ChatHistoryMessageTypeEnum.USER.getValue(), loginUser.getId());
         // 6. 调用 AI 生成代码（流式）
@@ -189,6 +184,30 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         // 7. 收集AI响应内容并在完成后记录到对话历史
         return streamHandlerExecutor.doExecute(contentFlux, chatHistoryService, appId, loginUser, codeGenTypeEnum);
 
+    }
+
+    /**
+     * 获取代码生成类型；新建应用初始为空时，在首次生成前完成 AI 路由并持久化。
+     */
+    private CodeGenTypeEnum resolveCodeGenType(App app, String message) {
+        String codeGenTypeStr = app.getCodeGenType();
+        if (StrUtil.isNotBlank(codeGenTypeStr)) {
+            CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenTypeStr);
+            if (codeGenTypeEnum == null) {
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "不支持的代码生成类型");
+            }
+            return codeGenTypeEnum;
+        }
+        String routePrompt = StrUtil.blankToDefault(app.getInitPrompt(), message);
+        CodeGenTypeEnum codeGenTypeEnum = codeGenTypeResolver.routeOrDefault(routePrompt);
+        App updateApp = new App();
+        updateApp.setId(app.getId());
+        updateApp.setCodeGenType(codeGenTypeEnum.getValue());
+        boolean updateResult = this.updateById(updateApp);
+        ThrowUtils.throwIf(!updateResult, ErrorCode.OPERATION_ERROR, "更新应用代码生成类型失败");
+        app.setCodeGenType(codeGenTypeEnum.getValue());
+        log.info("应用首次生成时完成代码类型路由，ID: {}, 类型: {}", app.getId(), codeGenTypeEnum.getValue());
+        return codeGenTypeEnum;
     }
 
     /**
@@ -218,7 +237,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         }
         // 5. 获取代码生成类型，构建源目录路径
         String codeGenType = app.getCodeGenType();
-        String sourceDirName = codeGenType + "_" + appId;
+        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
+        ThrowUtils.throwIf(codeGenTypeEnum == null, ErrorCode.OPERATION_ERROR, "应用代码不存在，请先生成代码");
+        String sourceDirName = codeGenTypeEnum.getValue() + "_" + appId;
         String sourceDirPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + sourceDirName;
         // 6. 检查源目录是否存在
         File sourceDir = new File(sourceDirPath);
@@ -226,7 +247,6 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "应用代码不存在，请先生成代码");
         }
         // 7. Vue 项目特殊处理：执行构建
-        CodeGenTypeEnum codeGenTypeEnum = CodeGenTypeEnum.getEnumByValue(codeGenType);
         if (codeGenTypeEnum == CodeGenTypeEnum.VUE_PROJECT) {
             // Vue 项目需要构建
             boolean buildSuccess = vueProjectBuilder.buildProject(sourceDirPath);
