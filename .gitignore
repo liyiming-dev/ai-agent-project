@@ -34,4 +34,5 @@ build/
 
 ### custom ###
 application-local
+application-prod
 tmp

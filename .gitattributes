@@ -1,5 +1,5 @@
 ### CUSTOM ###
 application-local.yml
-
+application-prod.yml
 /mvnw text eol=lf
 *.cmd text eol=crlf
