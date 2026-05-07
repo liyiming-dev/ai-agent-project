@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 /**
  * 对话历史 实体类。
  *
- * @author <a href="https://github.com/liyupi">程序员鱼皮</a>
+ * @author <a href="https://github.com/liyiming">yiming</a>
  */
 @Data
 @Builder

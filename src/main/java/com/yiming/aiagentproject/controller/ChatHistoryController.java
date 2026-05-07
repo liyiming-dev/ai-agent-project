@@ -24,7 +24,7 @@ import java.util.List;
 /**
  * 对话历史 控制层。
  *
- * @author <a href="https://github.com/liyupi">程序员鱼皮</a>
+ * @author <a href="https://github.com/liyiming">yiming</a>
  */
 @RestController
 @RequestMapping("/chatHistory")

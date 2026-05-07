@@ -3,7 +3,7 @@ package com.yiming.aiagentproject.core.parser;
 /**
  * 代码解析器策略接口
  * 
- * @author yupi
+ * @author yiming
  */
 public interface CodeParser<T> {
 

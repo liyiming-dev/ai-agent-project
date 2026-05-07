@@ -7,7 +7,7 @@
         <span class="footer-sep">·</span>
         <span>编程导航原创项目 by</span>
         <a href="https://www.codefather.cn" target="_blank" rel="noopener noreferrer">
-          程序员鱼皮
+          yiming
         </a>
       </div>
     </div>

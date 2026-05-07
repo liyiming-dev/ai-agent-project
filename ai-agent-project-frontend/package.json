@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "pure-build": "vite build",
     "dev": "vite",
     "build": "run-p type-check \"build-only {@}\" --",
     "openapi2ts": "node ./scripts/openapi2ts.mjs",
