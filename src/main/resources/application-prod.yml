@@ -23,9 +23,10 @@ langchain4j:
       base-url: https://api.deepseek.com
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
       model-name: deepseek-v4-flash
-      max-tokens: 64000
-      log-requests: true      # 开启请求日志
-      log-responses: true
+      # 仅用于路由/图片计划/HTML多文件结果对象的非流式调用，不需要大输出
+      max-tokens: 8192
+      log-requests: false
+      log-responses: false
       strict-json-schema: true
       response-format: json_object
       max-retries : 3
@@ -33,17 +34,19 @@ langchain4j:
       base-url: https://api.deepseek.com
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
       model-name: deepseek-v4-flash
-      max-tokens: 64000
-      log-requests: true
-      log-responses: true
+      # HTML / 多文件流式生成的输出预算
+      max-tokens: 16384
+      log-requests: false
+      log-responses: false
     # 推理模型（Vue 项目生成使用，启用 thinking 模式）
     reasoning-streaming-chat-model:
       base-url: https://api.deepseek.com
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
       model-name: deepseek-v4-pro
-      max-tokens: 64000
-      log-requests: true
-      log-responses: true
+      # Vue 项目带 reasoning + tool calls，输出预算适当大一些
+      max-tokens: 24576
+      log-requests: false
+      log-responses: false
     # 路由判断模型（仅用于代码生成类型路由判断，可使用更轻量/便宜的模型）
     routing-chat-model:
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
@@ -52,8 +55,8 @@ langchain4j:
       temperature: 0.0
       max-tokens: 4096
       max-retries: 3
-      log-requests: true
-      log-responses: true
+      log-requests: false
+      log-responses: false
       response-format: json_object
 # 添加 COS 对象存储配置（需要从腾讯云获取）
 aliyun:

@@ -10,6 +10,7 @@ import com.yiming.aiagentproject.langgraph4j.tool.ImageSearchTool;
 import com.yiming.aiagentproject.langgraph4j.tool.LogoGeneratorTool;
 import com.yiming.aiagentproject.langgraph4j.tool.MermaidDiagramTool;
 import com.yiming.aiagentproject.langgraph4j.tool.UndrawIllustrationTool;
+import jakarta.annotation.PreDestroy;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -18,6 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -44,12 +49,48 @@ public class ImageCollectionOrchestrator {
     private LogoGeneratorTool logoGeneratorTool;
 
     /**
+     * 专门用于"图片收集外层调度"的线程池：
+     * - 与内部并发任务的 ForkJoinPool common 池解耦，避免被业务线程拖死
+     * - daemon 线程，应用退出时不阻塞 JVM
+     */
+    private final ExecutorService outerExecutor = Executors.newFixedThreadPool(4, new ThreadFactory() {
+        private final AtomicInteger seq = new AtomicInteger(1);
+
+        @Override
+        public Thread newThread(Runnable r) {
+            Thread t = new Thread(r, "image-collect-outer-" + seq.getAndIncrement());
+            t.setDaemon(true);
+            return t;
+        }
+    });
+
+    @PreDestroy
+    public void shutdown() {
+        outerExecutor.shutdownNow();
+    }
+
+    /**
      * 基于原始用户提示词，自动收集相关素材并产出增强后的提示词。
      * 任意阶段失败都会降级为返回原提示词，保证主流程不受影响。
      */
     public String enhancePromptWithImages(String originalPrompt) {
         List<ImageResource> images = collectImages(originalPrompt);
         return buildEnhancedPrompt(originalPrompt, images);
+    }
+
+    /**
+     * 异步收集素材：立即返回 CompletableFuture，主链路无需等待。
+     * 失败时返回空列表，调用方据此决定是否触发"注入回合"。
+     */
+    public CompletableFuture<List<ImageResource>> collectImagesAsync(String originalPrompt) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return collectImages(originalPrompt);
+            } catch (Exception e) {
+                log.error("异步图片收集失败: {}", e.getMessage(), e);
+                return new ArrayList<>();
+            }
+        }, outerExecutor);
     }
 
     /**
@@ -119,6 +160,20 @@ public class ImageCollectionOrchestrator {
         String enhanced = builder.toString();
         log.info("提示词增强完成，增强后长度: {} 字符", enhanced.length());
         return enhanced;
+    }
+
+    /**
+     * 构造"素材注入回合"使用的用户消息：基于上一轮已生成的代码，
+     * 让模型按使用规则把素材补进去并重新输出完整代码。
+     */
+    public String buildInjectionPrompt(List<ImageResource> imageList) {
+        StringBuilder builder = new StringBuilder();
+        builder.append("素材已收集完毕。请基于你刚才生成的代码，将以下素材按各分组的使用规则嵌入到合适的位置，"
+                + "保持原有的结构与功能不变，重新输出完整的代码（保留与上一轮相同的代码块格式）。"
+                + "如果某条素材没有合适位置，宁可丢弃也不要硬塞。\n\n");
+        builder.append("## 可用素材资源\n");
+        appendImagesByCategory(builder, imageList);
+        return builder.toString();
     }
 
     private static void appendImagesByCategory(StringBuilder builder, List<ImageResource> imageList) {
