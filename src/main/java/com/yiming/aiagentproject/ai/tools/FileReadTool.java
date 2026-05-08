@@ -21,7 +21,14 @@ import java.nio.file.Paths;
 @Component
 public class FileReadTool extends BaseTool{
 
-    @Tool("读取指定路径的文件内容")
+    /**
+     * 单次返回给模型的最大字符数。
+     * 超过将截断并提示模型改用片段化策略。
+     * 防止 readFile 整段大文件回写到 chat memory，撑大下一轮 prompt（Vue 工具循环越走越慢的次要原因）。
+     */
+    private static final int MAX_RETURN_CHARS = 8000;
+
+    @Tool("读取指定路径的文件内容。返回内容若超过约 8KB 将被截断，仅返回开头部分；如需修改大文件请改用 modifyFile 按片段操作，禁止反复 read 同一文件以求阅读全文。")
     public String readFile(
             @P("文件的相对路径")
             String relativeFilePath,
@@ -37,7 +44,14 @@ public class FileReadTool extends BaseTool{
             if (!Files.exists(path) || !Files.isRegularFile(path)) {
                 return "错误：文件不存在或不是文件 - " + relativeFilePath;
             }
-            return Files.readString(path);
+            String content = Files.readString(path);
+            if (content.length() <= MAX_RETURN_CHARS) {
+                return content;
+            }
+            String head = content.substring(0, MAX_RETURN_CHARS);
+            return head + "\n\n[文件被截断：原文 " + content.length() + " 字符，仅返回前 "
+                    + MAX_RETURN_CHARS + " 字符。如需修改请直接基于已知信息用 modifyFile 替换具体片段，"
+                    + "或用 writeFile 整体重写；不要为读完全文反复调用本工具。]";
         } catch (IOException e) {
             String errorMessage = "读取文件失败: " + relativeFilePath + ", 错误: " + e.getMessage();
             log.error(errorMessage, e);

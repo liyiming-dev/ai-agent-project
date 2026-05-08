@@ -18,7 +18,7 @@ import com.yiming.aiagentproject.model.entity.User;
 import com.yiming.aiagentproject.service.ChatHistoryService;
 import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.data.message.UserMessage;
-import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.memory.ChatMemory;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -39,6 +39,13 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
     @Resource
     private AppMapper appMapper;
 
+    /**
+     * 单条消息入库的字符上限。
+     * MySQL MEDIUMTEXT 上限 ~16MB(字节),按 utf8mb4 最坏 4 字节/字符算约 4M 字符,留一半余量取 2_000_000。
+     * 超出会被尾部截断并加 [已截断: 原文 X 字符] 标记，避免 Data truncation 直接抛异常打断流式落库。
+     */
+    private static final int MESSAGE_MAX_CHARS = 2_000_000;
+
     @Override
     public boolean addChatMessage(Long appId, String message, String messageType, Long userId) {
         ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用ID不能为空");
@@ -48,13 +55,25 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         // 验证消息类型是否有效
         ChatHistoryMessageTypeEnum messageTypeEnum = ChatHistoryMessageTypeEnum.getEnumByValue(messageType);
         ThrowUtils.throwIf(messageTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的消息类型: " + messageType);
+        String safeMessage = truncateIfTooLong(message, appId);
         ChatHistory chatHistory = ChatHistory.builder()
                 .appId(appId)
-                .message(message)
+                .message(safeMessage)
                 .messageType(messageType)
                 .userId(userId)
                 .build();
         return this.save(chatHistory);
+    }
+
+    private String truncateIfTooLong(String message, Long appId) {
+        if (message == null || message.length() <= MESSAGE_MAX_CHARS) {
+            return message;
+        }
+        log.warn("聊天消息超长，已截断。appId={}, 原长度={}, 截断后={}",
+                appId, message.length(), MESSAGE_MAX_CHARS);
+        return message.substring(0, MESSAGE_MAX_CHARS)
+                + "\n\n[已截断: 原文 " + message.length() + " 字符，仅保留前 "
+                + MESSAGE_MAX_CHARS + " 字符]";
     }
 
     @Override
@@ -141,7 +160,7 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
      * @return
      */
     @Override
-    public int loadChatHistoryToMemory(Long appId, MessageWindowChatMemory chatMemory, int maxCount) {
+    public int loadChatHistoryToMemory(Long appId, ChatMemory chatMemory, int maxCount) {
         try {
             // 直接构造查询条件，起始点为 1 而不是 0，用于排除最新的用户消息
             QueryWrapper queryWrapper = QueryWrapper.create()

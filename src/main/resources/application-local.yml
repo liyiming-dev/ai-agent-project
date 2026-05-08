@@ -6,8 +6,9 @@ langchain4j:
       model-name: deepseek-v4-flash
       # 仅用于路由/图片计划/HTML多文件结果对象的非流式调用，不需要大输出
       max-tokens: 8192
-      log-requests: true      # 开启请求日志
-      log-responses: true
+      # 流式 Vue 长 prompt 在 Windows 控制台逐 chunk 打日志会拖慢每 token 处理；本地默认关闭
+      log-requests: false
+      log-responses: false
       strict-json-schema: true
       response-format: json_object
       max-retries : 3
@@ -17,8 +18,8 @@ langchain4j:
       model-name: deepseek-v4-flash
       # HTML / 多文件流式生成的输出预算
       max-tokens: 16384
-      log-requests: true
-      log-responses: true
+      log-requests: false
+      log-responses: false
     # 推理模型（Vue 项目生成使用，启用 thinking 模式）
     reasoning-streaming-chat-model:
       base-url: https://api.deepseek.com
@@ -26,8 +27,8 @@ langchain4j:
       model-name: deepseek-v4-flash
       # Vue 项目带 reasoning + tool calls，输出预算适当大一些
       max-tokens: 24576
-      log-requests: true
-      log-responses: true
+      log-requests: false
+      log-responses: false
     # 路由判断模型（仅用于代码生成类型路由判断，可使用更轻量/便宜的模型）
     routing-chat-model:
       base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
@@ -36,8 +37,8 @@ langchain4j:
       temperature: 0.0
       max-tokens: 4096
       max-retries: 3
-      log-requests: true
-      log-responses: true
+      log-requests: false
+      log-responses: false
       response-format: json_object
 
 
@@ -55,4 +56,4 @@ dashscope:
 
 logging:
   level:
-    dev.langchain4j: INFO
+    dev.langchain4j: WARN

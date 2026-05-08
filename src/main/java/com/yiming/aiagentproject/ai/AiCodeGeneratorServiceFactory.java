@@ -2,6 +2,7 @@ package com.yiming.aiagentproject.ai;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import com.yiming.aiagentproject.ai.memory.ThinkingTrimmingChatMemory;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
 import com.yiming.aiagentproject.ai.tools.ToolManager;
 import com.yiming.aiagentproject.exception.BusinessException;
@@ -9,9 +10,13 @@ import com.yiming.aiagentproject.exception.ErrorCode;
 import com.yiming.aiagentproject.service.ChatHistoryService;
 import dev.langchain4j.community.store.memory.chat.redis.RedisChatMemoryStore;
 import dev.langchain4j.data.message.ToolExecutionResultMessage;
+import dev.langchain4j.memory.ChatMemory;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
+import dev.langchain4j.memory.chat.TokenWindowChatMemory;
+import dev.langchain4j.model.TokenCountEstimator;
 import dev.langchain4j.model.chat.ChatModel;
 import dev.langchain4j.model.chat.StreamingChatModel;
+import dev.langchain4j.model.openai.OpenAiTokenCountEstimator;
 import dev.langchain4j.service.AiServices;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +43,20 @@ public class AiCodeGeneratorServiceFactory {
     private ChatHistoryService chatHistoryService;
     @Resource
     private ToolManager toolManager;
+
+    /**
+     * Vue 项目对话记忆使用的 token 预算。
+     * 配合 {@link ThinkingTrimmingChatMemory} 剥离历史 reasoning_content 后，
+     * 上限以"实际可见文本 + 工具调用 + 工具结果"计算，避免按消息条数计窗时单条 thinking 可能超几 k token。
+     */
+    private static final int VUE_MEMORY_MAX_TOKENS = 12000;
+
+    /**
+     * 用 OpenAI 的 cl100k_base 编码近似 DeepSeek 的分词。
+     * DeepSeek 没有公开 SDK 提供的 tokenizer，cl100k 误差通常在 ±10% 内，对窗口控制足够用。
+     */
+    private final TokenCountEstimator chatMemoryTokenCountEstimator =
+            new OpenAiTokenCountEstimator("gpt-4");
 
     /**
      * AI 服务实例缓存
@@ -79,12 +98,27 @@ public class AiCodeGeneratorServiceFactory {
      */
     private AiCodeGeneratorService createAiCodeGeneratorService(long appId, CodeGenTypeEnum codeGenType) {
         // 根据 appId 构建独立的对话记忆
-        MessageWindowChatMemory chatMemory = MessageWindowChatMemory
-                .builder()
-                .id(appId)
-                .chatMemoryStore(redisChatMemoryStore)
-                .maxMessages(20)
-                .build();
+        // Vue 项目使用 token 窗口 + thinking 裁剪：
+        //   1. token 窗口：让窗口按真实 token 预算裁剪，避免 maxMessages=20 时单条 thinking 几 k token 撑爆 prompt
+        //   2. thinking 裁剪：仅最近一条 AiMessage 的 reasoning_content 回传给模型，历史轮 thinking 全部剥掉，
+        //      解决"越输出越慢"——历史 reasoning 累积造成的 prompt 雪球
+        // HTML / MULTI_FILE 不走 reasoning，沿用消息窗口即可
+        ChatMemory chatMemory;
+        if (codeGenType == CodeGenTypeEnum.VUE_PROJECT) {
+            ChatMemory inner = TokenWindowChatMemory.builder()
+                    .id(appId)
+                    .chatMemoryStore(redisChatMemoryStore)
+                    .maxTokens(VUE_MEMORY_MAX_TOKENS, chatMemoryTokenCountEstimator)
+                    .build();
+            chatMemory = new ThinkingTrimmingChatMemory(inner);
+        } else {
+            chatMemory = MessageWindowChatMemory
+                    .builder()
+                    .id(appId)
+                    .chatMemoryStore(redisChatMemoryStore)
+                    .maxMessages(20)
+                    .build();
+        }
         // 从数据库加载历史对话到记忆中
         chatHistoryService.loadChatHistoryToMemory(appId, chatMemory, 20);
         // 根据代码生成类型选择不同的模型配置
