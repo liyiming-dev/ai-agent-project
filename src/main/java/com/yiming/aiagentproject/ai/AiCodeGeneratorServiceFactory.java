@@ -99,7 +99,9 @@ public class AiCodeGeneratorServiceFactory {
                     .hallucinatedToolNameStrategy(toolExecutionRequest -> ToolExecutionResultMessage.from(
                             toolExecutionRequest, "Error: there is no tool called " + toolExecutionRequest.name()
                     ))
-                    .maxSequentialToolsInvocations(30) //最多一次回答调用30次工具,避免无限循环
+                    // Vue 项目正常一次会写 20+ 文件，再叠加修改场景的读改链，30 偏紧；放宽到 60
+                    // 真正的循环防护靠 FileModifyTool 的重复失配拦截 + 提示词分批输出进度（中间文本会重置计数）
+                    .maxSequentialToolsInvocations(60)
                     .build();
             // HTML 和多文件生成使用默认模型
             case HTML, MULTI_FILE -> AiServices.builder(AiCodeGeneratorService.class)
