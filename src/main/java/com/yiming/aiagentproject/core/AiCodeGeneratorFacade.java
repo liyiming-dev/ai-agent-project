@@ -4,7 +4,13 @@ import cn.hutool.core.collection.CollUtil;
 import cn.hutool.json.JSONUtil;
 import com.yiming.aiagentproject.ai.AiCodeGeneratorService;
 import com.yiming.aiagentproject.ai.AiCodeGeneratorServiceFactory;
+import com.yiming.aiagentproject.ai.imagecollection.HeuristicSlotPlanner;
 import com.yiming.aiagentproject.ai.imagecollection.ImageCollectionOrchestrator;
+import com.yiming.aiagentproject.ai.imagecollection.ImageSlotBinder;
+import com.yiming.aiagentproject.ai.imagecollection.ImageSlotPromptBuilder;
+import com.yiming.aiagentproject.ai.imagecollection.PlaceholderFallbackScrubber;
+import com.yiming.aiagentproject.ai.imagecollection.VueProjectPathResolver;
+import com.yiming.aiagentproject.ai.imagecollection.model.ImageSlotPlan;
 import com.yiming.aiagentproject.ai.model.HtmlCodeResult;
 import com.yiming.aiagentproject.ai.model.MultiFileCodeResult;
 import com.yiming.aiagentproject.ai.model.enums.CodeGenTypeEnum;
@@ -28,6 +34,7 @@ import reactor.core.scheduler.Schedulers;
 
 import java.io.File;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -47,11 +54,19 @@ public class AiCodeGeneratorFacade {
     @Resource
     private ImageCollectionOrchestrator imageCollectionOrchestrator;
 
+    @Resource
+    private HeuristicSlotPlanner heuristicSlotPlanner;
+
     /**
      * 等待异步素材收集结果的最长时间。
      * 超时则跳过"注入回合"，主链路代码已成功生成不会受影响。
      */
     private static final long IMAGE_INJECTION_WAIT_SECONDS = 25L;
+
+    /**
+     * Vue 工程目录中需要 scrub 的文本文件后缀。
+     */
+    private static final Set<String> VUE_SCRUB_EXTENSIONS = Set.of("vue", "js", "ts", "css", "html");
 
     /**
      * 统一入口：根据类型生成并保存代码
@@ -71,10 +86,12 @@ public class AiCodeGeneratorFacade {
         return switch (codeGenTypeEnum) {
             case HTML -> {
                 HtmlCodeResult result = aiCodeGeneratorService.generateHtmlCode(enhancedMessage);
+                scrubHtmlResult(result);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.HTML, appId);
             }
             case MULTI_FILE -> {
                 MultiFileCodeResult result = aiCodeGeneratorService.generateMultiFileCode(enhancedMessage);
+                scrubMultiFileResult(result);
                 yield CodeFileSaverExecutor.executeSaver(result, CodeGenTypeEnum.MULTI_FILE, appId);
             }
             default -> {
@@ -98,17 +115,23 @@ public class AiCodeGeneratorFacade {
         }
         // 根据 appId 获取对应的 AI 服务实例
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenType);
-        // 异步并发收集素材（不阻塞主链路）
-        CompletableFuture<List<ImageResource>> imagesFuture = imageCollectionOrchestrator.collectImagesAsync(userMessage);
         return switch (codeGenType) {
             case HTML -> {
-                Flux<String> firstStream = aiCodeGeneratorService.generateHtmlCodeStream(userMessage);
+                // 阶段 1：HTML 走启发式 plan + 槽位 prompt + 按 plan 派发收集 + binder。
+                ImageSlotPlan slotPlan = heuristicSlotPlanner.buildHeuristicPlan(userMessage, CodeGenTypeEnum.HTML);
+                CompletableFuture<List<ImageResource>> htmlImagesFuture =
+                        imageCollectionOrchestrator.collectImagesByPlanAsync(slotPlan);
+                String promptWithSlots = ImageSlotPromptBuilder.buildPromptWithImageSlots(userMessage, slotPlan);
+                Flux<String> firstStream = aiCodeGeneratorService.generateHtmlCodeStream(promptWithSlots);
                 yield processCodeStreamWithInjection(
                         firstStream,
                         injectionPrompt -> aiCodeGeneratorService.generateHtmlCodeStream(injectionPrompt),
-                        CodeGenTypeEnum.HTML, appId, imagesFuture);
+                        CodeGenTypeEnum.HTML, appId, htmlImagesFuture);
             }
             case MULTI_FILE -> {
+                // 阶段 1 暂不动 MULTI_FILE：仍走老路径（后续阶段 2 接入槽位机制）。
+                CompletableFuture<List<ImageResource>> imagesFuture =
+                        imageCollectionOrchestrator.collectImagesAsync(userMessage);
                 Flux<String> firstStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
                 yield processCodeStreamWithInjection(
                         firstStream,
@@ -116,13 +139,17 @@ public class AiCodeGeneratorFacade {
                         CodeGenTypeEnum.MULTI_FILE, appId, imagesFuture);
             }
             case VUE_PROJECT -> {
+                // 阶段 1 暂不动 Vue：仍走老路径（后续阶段 3-5 接入槽位机制）。
+                CompletableFuture<List<ImageResource>> imagesFuture =
+                        imageCollectionOrchestrator.collectImagesAsync(userMessage);
                 TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
                 Flux<String> firstStream = processTokenStream(tokenStream);
                 yield processVueStreamWithInjection(
                         firstStream,
                         injectionPrompt -> processTokenStream(
                                 aiCodeGeneratorService.generateVueProjectCodeStream(appId, injectionPrompt)),
-                        imagesFuture);
+                        imagesFuture,
+                        appId);
             }
 
             default -> {
@@ -197,6 +224,16 @@ public class AiCodeGeneratorFacade {
                         log.info("素材为空或等待超时，跳过素材注入回合");
                         return Flux.<String>empty();
                     }
+                    // Phase 1：若首轮模型已经按占位符规则输出，binder 在 doOnComplete 中即可完成替换，
+                    // 此时再走二轮 injection 等于让模型把同一份 HTML 重新生成一遍，
+                    // 既慢又会让前端感觉"流到一半停了"。预跑一次 binder：命中 > 0 就跳过二轮，
+                    // 命中 = 0 时（模型未遵守规则）才走二轮兜底。
+                    String firstSnapshot = firstBuilder.toString();
+                    int firstHits = ImageSlotBinder.bind(firstSnapshot, images).hitCount();
+                    if (firstHits > 0) {
+                        log.info("首轮已命中 {} 处占位符，跳过二轮 injection", firstHits);
+                        return Flux.<String>empty();
+                    }
                     injectionRan.set(true);
                     String injectionPrompt = imageCollectionOrchestrator.buildInjectionPrompt(images);
                     String banner = "\n\n[已收集到 " + images.size() + " 项素材，正在更新页面...]\n\n";
@@ -217,10 +254,24 @@ public class AiCodeGeneratorFacade {
         return firstWithCollect
                 .concatWith(injection)
                 .doOnComplete(() -> {
+                    log.info("流式 doOnComplete 触发: codeGenType={}, injectionRan={}, firstLen={}, secondLen={}",
+                            codeGenTypeEnum, injectionRan.get(), firstBuilder.length(), secondBuilder.length());
                     String finalCode = pickFinalCode(firstBuilder, secondBuilder, injectionRan.get());
                     if (finalCode == null || finalCode.isEmpty()) {
+                        log.warn("流式 doOnComplete: finalCode 为空，跳过保存");
                         return;
                     }
+                    // 步骤 1：先按 slotId 把已收集到的真实素材绑定到占位符
+                    List<ImageResource> readyImages = imagesFuture.getNow(null);
+                    if (CollUtil.isNotEmpty(readyImages)) {
+                        ImageSlotBinder.BindResult bindResult = ImageSlotBinder.bind(finalCode, readyImages);
+                        log.info("代码保存前 bind: hitCount={}", bindResult.hitCount());
+                        finalCode = bindResult.content();
+                    }
+                    // 步骤 2：占位符兜底安全网，剩余的 __IMG_SLOT_*__ 强制替换为兜底图 URL
+                    PlaceholderFallbackScrubber.ScrubResult scrubResult = PlaceholderFallbackScrubber.scrub(finalCode);
+                    log.info("代码保存前 scrub: placeholderLeakCount={}", scrubResult.placeholderLeakCount());
+                    finalCode = scrubResult.content();
                     try {
                         Object parsedCode = CodeParserExecutor.executeParser(finalCode, codeGenTypeEnum);
                         File savedDir = CodeFileSaverExecutor.executeSaver(parsedCode, codeGenTypeEnum, appId);
@@ -228,7 +279,8 @@ public class AiCodeGeneratorFacade {
                     } catch (Exception e) {
                         log.error("保存失败: {}", e.getMessage());
                     }
-                });
+                })
+                .doOnError(e -> log.error("流式生成异常: {}", e.getMessage(), e));
     }
 
     /**
@@ -238,7 +290,8 @@ public class AiCodeGeneratorFacade {
     private Flux<String> processVueStreamWithInjection(
             Flux<String> firstStream,
             Function<String, Flux<String>> secondRoundFn,
-            CompletableFuture<List<ImageResource>> imagesFuture) {
+            CompletableFuture<List<ImageResource>> imagesFuture,
+            Long appId) {
         Flux<String> injection = Mono.fromCallable(() -> waitImages(imagesFuture))
                 .subscribeOn(Schedulers.boundedElastic())
                 .flatMapMany(images -> {
@@ -255,7 +308,66 @@ public class AiCodeGeneratorFacade {
                                 return Flux.<String>empty();
                             });
                 });
-        return firstStream.concatWith(injection);
+        return firstStream.concatWith(injection)
+                .doOnComplete(() -> scrubVueProjectSrc(appId));
+    }
+
+    /**
+     * 占位符兜底安全网：递归扫描 Vue 工程的 src/，把残留的 __IMG_SLOT_*__ 替换为兜底图 URL。
+     * 失败仅记录日志，不抛异常。
+     */
+    private void scrubVueProjectSrc(Long appId) {
+        try {
+            File srcDir = VueProjectPathResolver.resolveSrcDir(appId);
+            if (srcDir == null || !srcDir.exists() || !srcDir.isDirectory()) {
+                log.info("Vue 工程 src/ 不存在，跳过 scrub: appId={}", appId);
+                return;
+            }
+            int hit = PlaceholderFallbackScrubber.scrubDirectory(srcDir, VUE_SCRUB_EXTENSIONS);
+            log.info("Vue 工程 scrub 完成: appId={}, placeholderLeakCount={}", appId, hit);
+        } catch (Exception e) {
+            log.warn("Vue 工程 scrub 异常: appId={}, msg={}", appId, e.getMessage());
+        }
+    }
+
+    /**
+     * 同步路径：保存前把 HtmlCodeResult 字符串字段中的残留 __IMG_SLOT_*__ 兜底为可用 URL。
+     */
+    private void scrubHtmlResult(HtmlCodeResult result) {
+        if (result == null) {
+            return;
+        }
+        PlaceholderFallbackScrubber.ScrubResult scrubbed = PlaceholderFallbackScrubber.scrub(result.getHtmlCode());
+        if (scrubbed.placeholderLeakCount() > 0) {
+            result.setHtmlCode(scrubbed.content());
+        }
+        log.info("同步 HTML scrub: placeholderLeakCount={}", scrubbed.placeholderLeakCount());
+    }
+
+    /**
+     * 同步路径：保存前把 MultiFileCodeResult 三块代码字段中的残留 __IMG_SLOT_*__ 兜底为可用 URL。
+     */
+    private void scrubMultiFileResult(MultiFileCodeResult result) {
+        if (result == null) {
+            return;
+        }
+        int total = 0;
+        PlaceholderFallbackScrubber.ScrubResult htmlScrub = PlaceholderFallbackScrubber.scrub(result.getHtmlCode());
+        if (htmlScrub.placeholderLeakCount() > 0) {
+            result.setHtmlCode(htmlScrub.content());
+        }
+        total += htmlScrub.placeholderLeakCount();
+        PlaceholderFallbackScrubber.ScrubResult cssScrub = PlaceholderFallbackScrubber.scrub(result.getCssCode());
+        if (cssScrub.placeholderLeakCount() > 0) {
+            result.setCssCode(cssScrub.content());
+        }
+        total += cssScrub.placeholderLeakCount();
+        PlaceholderFallbackScrubber.ScrubResult jsScrub = PlaceholderFallbackScrubber.scrub(result.getJsCode());
+        if (jsScrub.placeholderLeakCount() > 0) {
+            result.setJsCode(jsScrub.content());
+        }
+        total += jsScrub.placeholderLeakCount();
+        log.info("同步 MULTI_FILE scrub: placeholderLeakCount={}", total);
     }
 
     private List<ImageResource> waitImages(CompletableFuture<List<ImageResource>> imagesFuture) {

@@ -26,6 +26,12 @@ public class ImageSearchTool {
 
     private static final String PEXELS_API_URL = "https://api.pexels.com/v1/search";
 
+    /** Pexels API 连接超时（ms）。 */
+    private static final int PEXELS_CONNECT_TIMEOUT_MS = 3_000;
+
+    /** Pexels API 读取超时（ms）。失败时立即返回空列表，避免拖累主流程。 */
+    private static final int PEXELS_READ_TIMEOUT_MS = 5_000;
+
     @Value("${pexels.api-key}")
     private String pexelsApiKey;
 
@@ -39,6 +45,8 @@ public class ImageSearchTool {
                 .form("query", query)
                 .form("per_page", searchCount)
                 .form("page", 1)
+                .setConnectionTimeout(PEXELS_CONNECT_TIMEOUT_MS)
+                .setReadTimeout(PEXELS_READ_TIMEOUT_MS)
                 .execute()) {
             if (response.isOk()) {
                 JSONObject result = JSONUtil.parseObj(response.body());

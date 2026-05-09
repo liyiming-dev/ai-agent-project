@@ -33,6 +33,13 @@ public class ImageResource implements Serializable {
      */
     private String url;
 
+    /**
+     * 图片槽位 id：对应 ImageSlotPlan 中的 slotId，
+     * 用于把异步收集到的素材精确绑定到首轮代码中的 __IMG_SLOT_*__ 占位符。
+     * 旧链路（无槽位计划时）允许为空。
+     */
+    private String slotId;
+
     @Serial
     private static final long serialVersionUID = 1L;
 }

@@ -14,6 +14,9 @@ type ChatMessage = {
   role: 'user' | 'ai'
   content: string
   loading?: boolean
+  // 流式回复期间为 true：此时只展示纯文本，避免 markdown-it 在每个 chunk 上 O(N^2) 重渲染整段
+  // 长 HTML/代码导致主线程卡死、SSE 事件堆积、整个页面冻结。
+  streaming?: boolean
   createTime?: string
 }
 
@@ -284,7 +287,7 @@ const sendMessage = (text: string) => {
   if (!appId.value || isPendingApp.value) return
 
   messages.value.push({ role: 'user', content })
-  messages.value.push({ role: 'ai', content: '', loading: true })
+  messages.value.push({ role: 'ai', content: '', loading: true, streaming: true })
   const aiMsg = messages.value[messages.value.length - 1]!
   sending.value = true
   previewReady.value = false
@@ -302,6 +305,8 @@ const sendMessage = (text: string) => {
     closeEventSource()
     sending.value = false
     aiMsg.loading = false
+    // 流式结束：切回 markdown 渲染（一次性，O(N) 不会卡）
+    aiMsg.streaming = false
     const ok = await fetchApp()
     if (!ok) return
     previewVersion.value = Date.now()
@@ -328,6 +333,7 @@ const sendMessage = (text: string) => {
     closeEventSource()
     sending.value = false
     aiMsg.loading = false
+    aiMsg.streaming = false
     if (doneReceived) {
       void finishSuccess()
     } else if (businessErrorReceived) {
@@ -354,6 +360,7 @@ const sendMessage = (text: string) => {
     closeEventSource()
     sending.value = false
     aiMsg.loading = false
+    aiMsg.streaming = false
     const errorMessage = parseSseBusinessError(event.data)
     aiMsg.content = errorMessage
     message.error(errorMessage)
@@ -383,6 +390,7 @@ const handleStop = () => {
   const last = messages.value[messages.value.length - 1]
   if (last && last.role === 'ai') {
     last.loading = false
+    last.streaming = false
     last.content = last.content
       ? `${last.content}\n\n（已手动中断生成）`
       : '（已手动中断生成）'
@@ -628,14 +636,12 @@ onBeforeUnmount(() => {
             >
               <div class="message-content">
                 <a-spin v-if="msg.loading && !msg.content" size="small" />
-                <template v-else>
-                  <div
-                    v-if="msg.role === 'ai'"
-                    class="markdown-body"
-                    v-html="renderMarkdown(msg.content)"
-                  ></div>
-                  <template v-else>{{ msg.content }}</template>
+                <template v-else-if="msg.role === 'ai'">
+                  <!-- 流式期间用纯文本：avoid markdown-it/hljs O(N^2) 重渲染卡死主线程 -->
+                  <div v-if="msg.streaming" class="streaming-text">{{ msg.content }}</div>
+                  <div v-else class="markdown-body" v-html="renderMarkdown(msg.content)"></div>
                 </template>
+                <template v-else>{{ msg.content }}</template>
               </div>
             </div>
           </template>
@@ -1016,6 +1022,16 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(15, 123, 138, 0.08);
   color: var(--ink-800);
   border-bottom-left-radius: 4px;
+}
+
+/* 流式期间临时纯文本展示，DOM 更新 O(N) 不会卡 */
+.streaming-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: var(--font-mono, Consolas, Monaco, 'Courier New', monospace);
+  color: var(--ink-800);
 }
 
 .input-area {

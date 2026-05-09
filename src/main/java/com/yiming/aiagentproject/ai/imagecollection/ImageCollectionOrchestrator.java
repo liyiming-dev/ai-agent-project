@@ -2,6 +2,9 @@ package com.yiming.aiagentproject.ai.imagecollection;
 
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.date.StopWatch;
+import cn.hutool.core.util.StrUtil;
+import com.yiming.aiagentproject.ai.imagecollection.model.ImageSlot;
+import com.yiming.aiagentproject.ai.imagecollection.model.ImageSlotPlan;
 import com.yiming.aiagentproject.langgraph4j.ai.ImageCollectionPlanService;
 import com.yiming.aiagentproject.langgraph4j.enums.ImageCategoryEnum;
 import com.yiming.aiagentproject.langgraph4j.model.ImageCollectionPlan;
@@ -91,6 +94,104 @@ public class ImageCollectionOrchestrator {
                 return new ArrayList<>();
             }
         }, outerExecutor);
+    }
+
+    /**
+     * 按 ImageSlotPlan 异步收集素材：每个 slot 派生一个收集任务，
+     * 返回的每条 {@link ImageResource} 都会回填对应 {@code slotId}，
+     * 与首轮 prompt 中的 {@code __IMG_SLOT_*__} 占位符一一对应。
+     *
+     * <p>失败时返回空列表，调用方据此走兜底替换。
+     */
+    public CompletableFuture<List<ImageResource>> collectImagesByPlanAsync(ImageSlotPlan plan) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return collectImagesByPlan(plan);
+            } catch (Exception e) {
+                log.error("按 plan 异步图片收集失败: {}", e.getMessage(), e);
+                return new ArrayList<>();
+            }
+        }, outerExecutor);
+    }
+
+    /**
+     * 同步执行：按 ImageSlotPlan 派发收集任务并回填 slotId。
+     */
+    public List<ImageResource> collectImagesByPlan(ImageSlotPlan plan) {
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
+        List<ImageResource> collected = new ArrayList<>();
+        if (plan == null || CollUtil.isEmpty(plan.getSlots())) {
+            return collected;
+        }
+        try {
+            List<CompletableFuture<List<ImageResource>>> futures = new ArrayList<>();
+            for (ImageSlot slot : plan.getSlots()) {
+                CompletableFuture<List<ImageResource>> future = dispatchSlot(slot);
+                if (future != null) {
+                    futures.add(future);
+                }
+            }
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            for (CompletableFuture<List<ImageResource>> future : futures) {
+                List<ImageResource> images = future.get();
+                if (CollUtil.isNotEmpty(images)) {
+                    collected.addAll(images);
+                }
+            }
+            log.info("按 plan 收集完成，slot 数={}，素材数={}", plan.getSlots().size(), collected.size());
+        } catch (Exception e) {
+            log.error("按 plan 图片收集失败: {}", e.getMessage(), e);
+        }
+        stopWatch.stop();
+        log.info("按 plan 图片收集总耗时: {} ms", stopWatch.getTotalTimeMillis());
+        return collected;
+    }
+
+    /**
+     * 单个 slot 派发到对应工具：每条返回的 {@link ImageResource} 回填 slotId，
+     * 收集失败仅记录日志并返回空列表（不抛异常，避免影响其它 slot）。
+     *
+     * <p>注意：子任务使用 ForkJoinPool.commonPool（{@code CompletableFuture.supplyAsync} 默认池），
+     * 与 {@link #outerExecutor} 错开池别，避免外层任务占满 outerExecutor 后再 join 子任务造成死锁
+     * （历史上 {@code collectImages} 的子任务亦走默认池）。
+     */
+    private CompletableFuture<List<ImageResource>> dispatchSlot(ImageSlot slot) {
+        if (slot == null || StrUtil.isEmpty(slot.getSlotId()) || slot.getCategory() == null) {
+            return null;
+        }
+        String slotId = slot.getSlotId();
+        String query = StrUtil.blankToDefault(slot.getQuery(), slot.getAlt());
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                List<ImageResource> raw = switch (slot.getCategory()) {
+                    case CONTENT -> imageSearchTool.searchContentImages(query);
+                    case ILLUSTRATION -> undrawIllustrationTool.searchIllustrations(query);
+                    case ARCHITECTURE -> mermaidDiagramTool.generateMermaidDiagram(query, query);
+                    case LOGO -> logoGeneratorTool.generateLogos(query);
+                };
+                return attachSlotId(raw, slotId);
+            } catch (Exception e) {
+                log.warn("slot[{}] 收集失败: {}", slotId, e.getMessage());
+                return new ArrayList<>();
+            }
+        });
+    }
+
+    /**
+     * 把 slotId 回填到工具返回的每条 ImageResource 上。
+     * 旧工具签名保持不变，slotId 在编排层统一回填，最小化改动。
+     */
+    private static List<ImageResource> attachSlotId(List<ImageResource> images, String slotId) {
+        if (CollUtil.isEmpty(images)) {
+            return new ArrayList<>();
+        }
+        for (ImageResource image : images) {
+            if (image != null && StrUtil.isEmpty(image.getSlotId())) {
+                image.setSlotId(slotId);
+            }
+        }
+        return images;
     }
 
     /**
