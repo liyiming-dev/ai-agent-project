@@ -14,8 +14,11 @@ import java.util.List;
 /**
  * 本地启发式图片槽位计划器：同步、纯本地、不调模型，全局 < 10ms。
  *
- * <p>阶段 1 仅支持 HTML 首轮，最简分桶：{@code hero_main_1} + {@code feature_1}。
- * 后续阶段会扩展 MULTI_FILE / VUE_PROJECT / 多轮持久化等分支。
+ * <p>阶段 1：HTML 首轮接入。
+ * <p>阶段 2：MULTI_FILE 接入，与 HTML 同分桶（{@code hero_main_1} + {@code feature_1}），
+ * 占位符在 ```html``` / ```css``` 代码块内出现，由共用的
+ * {@link ImageSlotBinder} / {@link PlaceholderFallbackScrubber} 处理。
+ * <p>VUE_PROJECT 后续阶段再扩展。
  */
 @Component
 public class HeuristicSlotPlanner {
@@ -26,17 +29,32 @@ public class HeuristicSlotPlanner {
      */
     public ImageSlotPlan buildHeuristicPlan(String userMessage, CodeGenTypeEnum codeGenType) {
         List<ImageSlot> slots = new ArrayList<>();
-        // 阶段 1：HTML 首轮固定分桶 hero_main_1 + feature_1。
-        // MULTI_FILE / VUE 后续阶段再扩展，这里先按最稳的 HTML 一致策略给基线。
         slots.add(buildHeroSlot(userMessage));
-        if (codeGenType == null || codeGenType == CodeGenTypeEnum.HTML) {
+        // HTML 与 MULTI_FILE 共用同一最简分桶：hero + feature；输出形态都是
+        // markdown 代码块，占位符语义一致，复用同一套绑定/兜底链路。
+        if (codeGenType == null
+                || codeGenType == CodeGenTypeEnum.HTML
+                || codeGenType == CodeGenTypeEnum.MULTI_FILE) {
             slots.add(buildFeatureSlot(userMessage));
         }
         return ImageSlotPlan.builder()
                 .slots(slots)
-                .layoutGuidance("首屏需要预留主视觉大图区域，特性区可使用一张配图卡片。")
+                .layoutGuidance(buildLayoutGuidance(codeGenType))
                 .source(SlotPlanSource.HEURISTIC)
                 .build();
+    }
+
+    /**
+     * 按生成类型给布局建议加一点引导。MULTI_FILE 时显式提示模型可在 CSS
+     * {@code background-image} 中使用占位符——这覆盖了"是否包含 CSS 替换分支"
+     * 的语义,binder 正则本身已经能匹配 {@code url(...)} 里的占位符。
+     */
+    private static String buildLayoutGuidance(CodeGenTypeEnum codeGenType) {
+        String base = "首屏需要预留主视觉大图区域，特性区可使用一张配图卡片。";
+        if (codeGenType == CodeGenTypeEnum.MULTI_FILE) {
+            return base + " 多文件场景下，特性区/装饰区也可使用 CSS background-image 引用占位符（同一 slotId 可在 HTML 与 CSS 中共用）。";
+        }
+        return base;
     }
 
     private ImageSlot buildHeroSlot(String userMessage) {

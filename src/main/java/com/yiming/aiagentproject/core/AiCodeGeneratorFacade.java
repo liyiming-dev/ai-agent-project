@@ -40,6 +40,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
+import java.util.regex.Pattern;
 
 /**
  * AI 代码生成门面类，组合生成和保存功能
@@ -67,6 +68,12 @@ public class AiCodeGeneratorFacade {
      * Vue 工程目录中需要 scrub 的文本文件后缀。
      */
     private static final Set<String> VUE_SCRUB_EXTENSIONS = Set.of("vue", "js", "ts", "css", "html");
+
+    /**
+     * 占位符存在性匹配：用于"首轮是否已写出 __IMG_SLOT_*__"的快速判断，
+     * 命中即认为模型遵守了槽位规则，可立即结束 SSE，不再阻塞等待异步素材。
+     */
+    private static final Pattern PLACEHOLDER_PRESENCE_PATTERN = Pattern.compile("__IMG_SLOT_[a-z0-9_]+__");
 
     /**
      * 统一入口：根据类型生成并保存代码
@@ -116,28 +123,12 @@ public class AiCodeGeneratorFacade {
         // 根据 appId 获取对应的 AI 服务实例
         AiCodeGeneratorService aiCodeGeneratorService = aiCodeGeneratorServiceFactory.getAiCodeGeneratorService(appId, codeGenType);
         return switch (codeGenType) {
-            case HTML -> {
-                // 阶段 1：HTML 走启发式 plan + 槽位 prompt + 按 plan 派发收集 + binder。
-                ImageSlotPlan slotPlan = heuristicSlotPlanner.buildHeuristicPlan(userMessage, CodeGenTypeEnum.HTML);
-                CompletableFuture<List<ImageResource>> htmlImagesFuture =
-                        imageCollectionOrchestrator.collectImagesByPlanAsync(slotPlan);
-                String promptWithSlots = ImageSlotPromptBuilder.buildPromptWithImageSlots(userMessage, slotPlan);
-                Flux<String> firstStream = aiCodeGeneratorService.generateHtmlCodeStream(promptWithSlots);
-                yield processCodeStreamWithInjection(
-                        firstStream,
-                        injectionPrompt -> aiCodeGeneratorService.generateHtmlCodeStream(injectionPrompt),
-                        CodeGenTypeEnum.HTML, appId, htmlImagesFuture);
-            }
-            case MULTI_FILE -> {
-                // 阶段 1 暂不动 MULTI_FILE：仍走老路径（后续阶段 2 接入槽位机制）。
-                CompletableFuture<List<ImageResource>> imagesFuture =
-                        imageCollectionOrchestrator.collectImagesAsync(userMessage);
-                Flux<String> firstStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
-                yield processCodeStreamWithInjection(
-                        firstStream,
-                        injectionPrompt -> aiCodeGeneratorService.generateMultiFileCodeStream(injectionPrompt),
-                        CodeGenTypeEnum.MULTI_FILE, appId, imagesFuture);
-            }
+            case HTML -> buildSlotBasedCodeStream(
+                    userMessage, CodeGenTypeEnum.HTML, appId,
+                    aiCodeGeneratorService::generateHtmlCodeStream);
+            case MULTI_FILE -> buildSlotBasedCodeStream(
+                    userMessage, CodeGenTypeEnum.MULTI_FILE, appId,
+                    aiCodeGeneratorService::generateMultiFileCodeStream);
             case VUE_PROJECT -> {
                 // 阶段 1 暂不动 Vue：仍走老路径（后续阶段 3-5 接入槽位机制）。
                 CompletableFuture<List<ImageResource>> imagesFuture =
@@ -193,6 +184,32 @@ public class AiCodeGeneratorFacade {
 
 
     /**
+     * HTML / MULTI_FILE 共用的"启发式 plan + 槽位 prompt + 异步收集 + 注入回合"主链路：
+     * <ol>
+     *     <li>本地启发式产出 {@link ImageSlotPlan}（< 10ms 同步）；</li>
+     *     <li>按 plan 异步派发素材收集（不阻塞主链路）；</li>
+     *     <li>把槽位段落拼到 userMessage 后形成首轮 prompt，立即开始流式生成；</li>
+     *     <li>首轮结束后若已命中占位符则跳过二轮，否则触发注入回合兜底。</li>
+     * </ol>
+     * 二轮回合实际多数场景不会触发——首轮模型按规则输出 {@code __IMG_SLOT_*__},
+     * binder 直接命中替换,前端不会感知到"中途停顿 + 重新生成"。
+     */
+    private Flux<String> buildSlotBasedCodeStream(
+            String userMessage,
+            CodeGenTypeEnum codeGenType,
+            Long appId,
+            Function<String, Flux<String>> streamFn) {
+        ImageSlotPlan slotPlan = heuristicSlotPlanner.buildHeuristicPlan(userMessage, codeGenType);
+        int slotCount = slotPlan.getSlots() == null ? 0 : slotPlan.getSlots().size();
+        CompletableFuture<List<ImageResource>> imagesFuture =
+                imageCollectionOrchestrator.collectImagesByPlanAsync(slotPlan);
+        String promptWithSlots = ImageSlotPromptBuilder.buildPromptWithImageSlots(userMessage, slotPlan);
+        Flux<String> firstStream = streamFn.apply(promptWithSlots);
+        return processCodeStreamWithInjection(
+                firstStream, streamFn, codeGenType, appId, imagesFuture, slotCount);
+    }
+
+    /**
      * HTML / MULTI_FILE 的流式处理：
      * 1. 首轮流以原始 prompt 直接生成；
      * 2. 首轮完成后等待素材异步结果（短超时），若有素材则触发"注入回合"再开一次流式生成；
@@ -203,84 +220,120 @@ public class AiCodeGeneratorFacade {
      * @param codeGenTypeEnum     代码生成类型
      * @param appId               应用 ID
      * @param imagesFuture        异步收集素材的 Future
+     * @param slotCount           槽位计划中的 slot 总数（用于打 bindRate 日志，0 表示无 plan）
      */
     private Flux<String> processCodeStreamWithInjection(
             Flux<String> firstStream,
             Function<String, Flux<String>> secondRoundFn,
             CodeGenTypeEnum codeGenTypeEnum,
             Long appId,
-            CompletableFuture<List<ImageResource>> imagesFuture) {
+            CompletableFuture<List<ImageResource>> imagesFuture,
+            int slotCount) {
         StringBuilder firstBuilder = new StringBuilder();
         StringBuilder secondBuilder = new StringBuilder();
         AtomicBoolean injectionRan = new AtomicBoolean(false);
 
         Flux<String> firstWithCollect = firstStream.doOnNext(firstBuilder::append);
 
-        // 用 boundedElastic 跑阻塞的 future.get，避免占用 Reactor 事件循环
-        Flux<String> injection = Mono.fromCallable(() -> waitImages(imagesFuture))
-                .subscribeOn(Schedulers.boundedElastic())
-                .flatMapMany(images -> {
-                    if (CollUtil.isEmpty(images)) {
-                        log.info("素材为空或等待超时，跳过素材注入回合");
-                        return Flux.<String>empty();
-                    }
-                    // Phase 1：若首轮模型已经按占位符规则输出，binder 在 doOnComplete 中即可完成替换，
-                    // 此时再走二轮 injection 等于让模型把同一份 HTML 重新生成一遍，
-                    // 既慢又会让前端感觉"流到一半停了"。预跑一次 binder：命中 > 0 就跳过二轮，
-                    // 命中 = 0 时（模型未遵守规则）才走二轮兜底。
-                    String firstSnapshot = firstBuilder.toString();
-                    int firstHits = ImageSlotBinder.bind(firstSnapshot, images).hitCount();
-                    if (firstHits > 0) {
-                        log.info("首轮已命中 {} 处占位符，跳过二轮 injection", firstHits);
-                        return Flux.<String>empty();
-                    }
-                    injectionRan.set(true);
-                    String injectionPrompt = imageCollectionOrchestrator.buildInjectionPrompt(images);
-                    String banner = "\n\n[已收集到 " + images.size() + " 项素材，正在更新页面...]\n\n";
-                    return Flux.concat(
-                            Flux.just(banner),
-                            secondRoundFn.apply(injectionPrompt)
-                                    .doOnNext(secondBuilder::append)
-                                    // 注入回合失败不应让整个请求失败：回退保留首轮代码
-                                    .onErrorResume(e -> {
-                                        log.warn("素材注入回合失败，回退到首轮代码: {}", e.getMessage());
-                                        injectionRan.set(false);
-                                        secondBuilder.setLength(0);
-                                        return Flux.just("\n\n[素材注入失败，保留无素材版本]\n\n");
-                                    })
-                    );
-                });
+        // 注入决策延迟到首轮流结束后（Flux.defer 在被订阅时才求值）：
+        // - 首轮已写占位符 → 立即返回 empty，SSE 立刻结束，绝不阻塞 25s；
+        //   binder 在 doOnComplete 用 imagesFuture.getNow(...) 拿真实素材，
+        //   罕见的"素材尚未到位"场景由 whenComplete 后台兜底再写一次。
+        // - 首轮没写占位符 → 走原路径：等异步素材，有就触发二轮 injection。
+        Flux<String> injection = Flux.defer(() -> {
+            if (PLACEHOLDER_PRESENCE_PATTERN.matcher(firstBuilder).find()) {
+                log.info("首轮已写出占位符，SSE 立即结束，binder 走 doOnComplete 同步路径");
+                return Flux.<String>empty();
+            }
+            log.info("首轮未写占位符，等待异步素材并决定是否走二轮 injection");
+            // 用 boundedElastic 跑阻塞的 future.get，避免占用 Reactor 事件循环
+            return Mono.fromCallable(() -> waitImages(imagesFuture))
+                    .subscribeOn(Schedulers.boundedElastic())
+                    .flatMapMany(images -> {
+                        if (CollUtil.isEmpty(images)) {
+                            log.info("素材为空或等待超时，跳过素材注入回合");
+                            return Flux.<String>empty();
+                        }
+                        injectionRan.set(true);
+                        String injectionPrompt = imageCollectionOrchestrator.buildInjectionPrompt(images);
+                        String banner = "\n\n[已收集到 " + images.size() + " 项素材，正在更新页面...]\n\n";
+                        return Flux.concat(
+                                Flux.just(banner),
+                                secondRoundFn.apply(injectionPrompt)
+                                        .doOnNext(secondBuilder::append)
+                                        // 注入回合失败不应让整个请求失败：回退保留首轮代码
+                                        .onErrorResume(e -> {
+                                            log.warn("素材注入回合失败，回退到首轮代码: {}", e.getMessage());
+                                            injectionRan.set(false);
+                                            secondBuilder.setLength(0);
+                                            return Flux.just("\n\n[素材注入失败，保留无素材版本]\n\n");
+                                        })
+                        );
+                    });
+        });
 
         return firstWithCollect
                 .concatWith(injection)
                 .doOnComplete(() -> {
                     log.info("流式 doOnComplete 触发: codeGenType={}, injectionRan={}, firstLen={}, secondLen={}",
                             codeGenTypeEnum, injectionRan.get(), firstBuilder.length(), secondBuilder.length());
-                    String finalCode = pickFinalCode(firstBuilder, secondBuilder, injectionRan.get());
-                    if (finalCode == null || finalCode.isEmpty()) {
-                        log.warn("流式 doOnComplete: finalCode 为空，跳过保存");
+                    String rawCode = pickFinalCode(firstBuilder, secondBuilder, injectionRan.get());
+                    if (rawCode == null || rawCode.isEmpty()) {
+                        log.warn("流式 doOnComplete: rawCode 为空，跳过保存");
                         return;
                     }
-                    // 步骤 1：先按 slotId 把已收集到的真实素材绑定到占位符
+                    // getNow 不阻塞：素材未就绪时 binder 命中 0，scrubber 兜底为 picsum 占位
                     List<ImageResource> readyImages = imagesFuture.getNow(null);
-                    if (CollUtil.isNotEmpty(readyImages)) {
-                        ImageSlotBinder.BindResult bindResult = ImageSlotBinder.bind(finalCode, readyImages);
-                        log.info("代码保存前 bind: hitCount={}", bindResult.hitCount());
-                        finalCode = bindResult.content();
-                    }
-                    // 步骤 2：占位符兜底安全网，剩余的 __IMG_SLOT_*__ 强制替换为兜底图 URL
-                    PlaceholderFallbackScrubber.ScrubResult scrubResult = PlaceholderFallbackScrubber.scrub(finalCode);
-                    log.info("代码保存前 scrub: placeholderLeakCount={}", scrubResult.placeholderLeakCount());
-                    finalCode = scrubResult.content();
-                    try {
-                        Object parsedCode = CodeParserExecutor.executeParser(finalCode, codeGenTypeEnum);
-                        File savedDir = CodeFileSaverExecutor.executeSaver(parsedCode, codeGenTypeEnum, appId);
-                        log.info("代码保存成功: {}", savedDir == null ? "?" : savedDir.getAbsolutePath());
-                    } catch (Exception e) {
-                        log.error("保存失败: {}", e.getMessage());
+                    boolean imagesPending = CollUtil.isEmpty(readyImages) && !imagesFuture.isDone();
+                    bindAndSave(rawCode, readyImages, codeGenTypeEnum, appId, slotCount);
+                    // 边界：首轮含占位符但素材还在收集 → 后台等结果再覆盖一次磁盘，
+                    // 用户下次刷新预览即可看到真实图片（前端如果已经显示则保留兜底图）
+                    if (!injectionRan.get() && imagesPending) {
+                        log.info("素材未就绪，后台 whenComplete 后再补一次 bind+save");
+                        imagesFuture.whenComplete((images, ex) -> {
+                            if (ex != null) {
+                                log.warn("后台素材等待异常: {}", ex.getMessage());
+                                return;
+                            }
+                            if (CollUtil.isNotEmpty(images)) {
+                                bindAndSave(rawCode, images, codeGenTypeEnum, appId, slotCount);
+                            }
+                        });
                     }
                 })
                 .doOnError(e -> log.error("流式生成异常: {}", e.getMessage(), e));
+    }
+
+    /**
+     * 把首/二轮拼好的原始代码经 binder + scrubber 处理后落盘。
+     * 抽出来是为了支持 doOnComplete 同步保存 + whenComplete 后台再保存两个调用点。
+     */
+    private void bindAndSave(
+            String rawCode,
+            List<ImageResource> images,
+            CodeGenTypeEnum codeGenType,
+            Long appId,
+            int slotCount) {
+        String code = rawCode;
+        if (CollUtil.isNotEmpty(images)) {
+            ImageSlotBinder.BindResult bindResult = ImageSlotBinder.bind(code, images);
+            String bindRate = slotCount > 0
+                    ? String.format("%.2f", (double) bindResult.hitCount() / slotCount)
+                    : "n/a";
+            log.info("代码保存前 bind: hitCount={}, slotCount={}, bindRate={}",
+                    bindResult.hitCount(), slotCount, bindRate);
+            code = bindResult.content();
+        }
+        PlaceholderFallbackScrubber.ScrubResult scrubResult = PlaceholderFallbackScrubber.scrub(code);
+        log.info("代码保存前 scrub: placeholderLeakCount={}", scrubResult.placeholderLeakCount());
+        code = scrubResult.content();
+        try {
+            Object parsedCode = CodeParserExecutor.executeParser(code, codeGenType);
+            File savedDir = CodeFileSaverExecutor.executeSaver(parsedCode, codeGenType, appId);
+            log.info("代码保存成功: {}", savedDir == null ? "?" : savedDir.getAbsolutePath());
+        } catch (Exception e) {
+            log.error("保存失败: {}", e.getMessage());
+        }
     }
 
     /**

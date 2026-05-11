@@ -108,6 +108,10 @@ let stoppedByUser = false
 let businessErrorReceived = false
 let codeGenTypeRefreshed = false
 
+// 流式渲染节流：scrollHeight 是同步 layout 触发器，连续读会让长消息渲染雪崩。
+// chunk 合批用 per-send 的局部变量管理（见 sendMessage 内部），避免串次发送残留。
+let scrollPending = false
+
 // 可视化编辑模式
 const {
   editMode,
@@ -139,7 +143,11 @@ const formatDateTime = (value?: string) => {
 const renderMarkdown = (text: string) => md.render(text || '')
 
 const scrollToBottom = () => {
-  nextTick(() => {
+  // 节流到每帧 1 次：scrollHeight 是同步 layout 触发器，连续读会让长消息的渲染雪崩
+  if (scrollPending) return
+  scrollPending = true
+  requestAnimationFrame(() => {
+    scrollPending = false
     if (messagesRef.value) {
       messagesRef.value.scrollTop = messagesRef.value.scrollHeight
     }
@@ -301,7 +309,22 @@ const sendMessage = (text: string) => {
   closeEventSource()
   eventSource = new EventSource(url, { withCredentials: true })
 
+  // chunk 合批：onmessage 只推到本地数组，rAF 里 join 后一次性赋值给 aiMsg.content。
+  // 比 += 拼接每个 chunk 省去大量字符串拷贝，比"每个 chunk 触发 Vue 重渲染"省去多帧 layout。
+  let pendingChunks: string[] = []
+  let flushScheduled = false
+  const flushPendingChunks = () => {
+    flushScheduled = false
+    if (pendingChunks.length === 0) return
+    aiMsg.content = aiMsg.content + pendingChunks.join('')
+    pendingChunks = []
+    aiMsg.loading = false
+    scrollToBottom()
+  }
+
   const finishSuccess = async () => {
+    // 排空尚未通过 rAF 应用的 chunk，再切到 markdown 渲染，否则末尾会缺一帧内容
+    flushPendingChunks()
     closeEventSource()
     sending.value = false
     aiMsg.loading = false
@@ -317,19 +340,23 @@ const sendMessage = (text: string) => {
     try {
       const parsed = JSON.parse(event.data)
       const chunk = typeof parsed === 'string' ? parsed : (parsed.d ?? parsed.data ?? '')
-      aiMsg.content += chunk
+      pendingChunks.push(chunk)
     } catch {
-      aiMsg.content += event.data
+      pendingChunks.push(event.data)
     }
-    aiMsg.loading = false
     if (!codeGenTypeRefreshed && !app.value?.codeGenType) {
       codeGenTypeRefreshed = true
       void fetchApp()
     }
-    scrollToBottom()
+    if (!flushScheduled) {
+      flushScheduled = true
+      requestAnimationFrame(flushPendingChunks)
+    }
   }
 
   eventSource.onerror = () => {
+    // 在切换到 markdown 渲染 / 拼接错误提示前先排空 buffer，否则末尾内容会丢
+    flushPendingChunks()
     closeEventSource()
     sending.value = false
     aiMsg.loading = false
@@ -357,6 +384,9 @@ const sendMessage = (text: string) => {
 
   eventSource.addEventListener('business-error', (event) => {
     businessErrorReceived = true
+    // 业务错误时丢弃尚未应用的 chunk（错误消息会整体覆盖 aiMsg.content）
+    pendingChunks = []
+    flushScheduled = false
     closeEventSource()
     sending.value = false
     aiMsg.loading = false
