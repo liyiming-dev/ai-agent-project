@@ -34,8 +34,8 @@ langchain4j:
       base-url: https://api.deepseek.com
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
       model-name: deepseek-v4-flash
-      # HTML / 多文件流式生成的输出预算（多文件需要拆 3 个代码块,16384 不够,提到 24576）
-      max-tokens: 24576
+      # HTML / 多文件流式生成的输出预算（多文件 HTML+CSS+JS 三段,24576 仍会截在 CSS/JS,提到 32768）
+      max-tokens: 64000
       log-requests: false
       log-responses: false
     # 推理模型（Vue 项目生成使用，启用 thinking 模式）
