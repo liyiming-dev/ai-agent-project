@@ -5,8 +5,8 @@ spring:
   # mysql
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://106.53.26.139:3306/ai-agent-project
-    username: root
+    url: jdbc:mysql://106.53.26.139:3306/ai_agent_project
+    username: user
     password: 1234
   # redis
   data:
@@ -34,7 +34,8 @@ langchain4j:
       base-url: https://api.deepseek.com
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
       model-name: deepseek-v4-flash
-      # HTML / 多文件流式生成的输出预算（多文件 HTML+CSS+JS 三段,24576 仍会截在 CSS/JS,提到 32768）
+      # HTML / 多文件流式生成的输出预算。注意：ChatModelConfig 早期写错读了 chat-model.max-tokens(8192),
+      # 已修复为读取这里。若服务端硬上限低于此值，会被静默截断 — 完成日志的 finishReason=LENGTH 即命中上限。
       max-tokens: 64000
       log-requests: false
       log-responses: false
@@ -44,7 +45,7 @@ langchain4j:
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
       model-name: deepseek-v4-pro
       # Vue 项目带 reasoning + tool calls，输出预算适当大一些
-      max-tokens: 24576
+      max-tokens: 64000
       log-requests: false
       log-responses: false
     # 路由判断模型（仅用于代码生成类型路由判断，可使用更轻量/便宜的模型）

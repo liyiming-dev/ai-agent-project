@@ -35,6 +35,16 @@ public class ChatModelConfig {
     @Value("${langchain4j.open-ai.streaming-chat-model.model-name:${langchain4j.open-ai.chat-model.model-name}}")
     private String streamingModelName;
 
+    // streaming-chat-model.max-tokens 必须独立读取：HTML/多文件流式输出需要远大于非流式（routing/图片计划）的预算
+    @Value("${langchain4j.open-ai.streaming-chat-model.max-tokens:${langchain4j.open-ai.chat-model.max-tokens:8192}}")
+    private Integer streamingMaxTokens;
+
+    @Value("${langchain4j.open-ai.streaming-chat-model.log-requests:${langchain4j.open-ai.chat-model.log-requests:false}}")
+    private Boolean streamingLogRequests;
+
+    @Value("${langchain4j.open-ai.streaming-chat-model.log-responses:${langchain4j.open-ai.chat-model.log-responses:false}}")
+    private Boolean streamingLogResponses;
+
     @Value("${langchain4j.open-ai.chat-model.response-format:}")
     private String responseFormat;
 
@@ -64,9 +74,9 @@ public class ChatModelConfig {
                 .baseUrl(baseUrl)
                 .apiKey(apiKey)
                 .modelName(streamingModelName)
-                .maxTokens(maxTokens)
-                .logRequests(logRequests)
-                .logResponses(logResponses)
+                .maxTokens(streamingMaxTokens)
+                .logRequests(streamingLogRequests)
+                .logResponses(streamingLogResponses)
                 .build();
     }
 }

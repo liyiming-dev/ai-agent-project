@@ -125,10 +125,12 @@ public class AiCodeGeneratorFacade {
         return switch (codeGenType) {
             case HTML -> buildSlotBasedCodeStream(
                     userMessage, CodeGenTypeEnum.HTML, appId,
-                    aiCodeGeneratorService::generateHtmlCodeStream);
+                    prompt -> processSimpleTokenStream(
+                            aiCodeGeneratorService.generateHtmlCodeStream(prompt), "HTML"));
             case MULTI_FILE -> buildSlotBasedCodeStream(
                     userMessage, CodeGenTypeEnum.MULTI_FILE, appId,
-                    aiCodeGeneratorService::generateMultiFileCodeStream);
+                    prompt -> processSimpleTokenStream(
+                            aiCodeGeneratorService.generateMultiFileCodeStream(prompt), "MULTI_FILE"));
             case VUE_PROJECT -> {
                 // 阶段 1 暂不动 Vue：仍走老路径（后续阶段 3-5 接入槽位机制）。
                 CompletableFuture<List<ImageResource>> imagesFuture =
@@ -150,6 +152,36 @@ public class AiCodeGeneratorFacade {
         };
     }
 
+
+    /**
+     * 将 HTML / MULTI_FILE 的 TokenStream 适配为下游期望的 {@code Flux<String>}：
+     * 仅透传纯文本 chunk（不做 JSON 包裹），并在完成时打印 finishReason / tokenUsage，
+     * 用于排查"模型输出被截断"的根因——finishReason=LENGTH 说明命中 max_tokens 上限，
+     * 此时需要调高 streaming-chat-model.max-tokens 或换模型；finishReason=STOP 则是模型自然停下。
+     *
+     * @param tokenStream langchain4j TokenStream
+     * @param tag         日志标签 (HTML / MULTI_FILE)，区分两路调用
+     * @return Flux<String> 纯文本流
+     */
+    private Flux<String> processSimpleTokenStream(TokenStream tokenStream, String tag) {
+        return Flux.create(sink -> {
+            tokenStream.onPartialResponse((String partialResponse) -> sink.next(partialResponse))
+                    .onCompleteResponse((ChatResponse response) -> {
+                        if (response != null) {
+                            log.info("{} 流式完成: finishReason={}, tokenUsage={}",
+                                    tag,
+                                    response.finishReason(),
+                                    response.tokenUsage());
+                        }
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
+                        log.error("{} 流式异常: {}", tag, error.getMessage(), error);
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
 
     /**
      * 将 TokenStream 转换为 Flux<String>，并传递工具调用信息

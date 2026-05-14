@@ -6,7 +6,6 @@ import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;
 import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.UserMessage;
-import reactor.core.publisher.Flux;
 
 public interface AiCodeGeneratorService {
 
@@ -27,22 +26,24 @@ public interface AiCodeGeneratorService {
     MultiFileCodeResult generateMultiFileCode(String userMessage);
 
     /**
-     * 生成 HTML 代码（流式）
+     * 生成 HTML 代码（流式）。返回 {@link TokenStream} 以便在 onCompleteResponse 中
+     * 拿到 finishReason / tokenUsage，用于排查 length 截断；外层 facade 通过适配器
+     * 转换成 {@code Flux<String>}。
      *
      * @param userMessage 用户消息
-     * @return 生成的代码结果
+     * @return TokenStream
      */
     @SystemMessage(fromResource = "prompt/generate-html-system-prompt.txt")
-    Flux<String> generateHtmlCodeStream(String userMessage);
+    TokenStream generateHtmlCodeStream(String userMessage);
 
     /**
-     * 生成多文件代码（流式）
+     * 生成多文件代码（流式）。同 generateHtmlCodeStream，返回 TokenStream 暴露完成元数据。
      *
      * @param userMessage 用户消息
-     * @return 生成的代码结果
+     * @return TokenStream
      */
     @SystemMessage(fromResource = "prompt/generate-multi-file-system-prompt.txt")
-    Flux<String> generateMultiFileCodeStream(String userMessage);
+    TokenStream generateMultiFileCodeStream(String userMessage);
 
     /**
      * 生成 Vue 项目代码（流式）

@@ -18,8 +18,12 @@ import java.util.List;
 @Slf4j
 public final class ImageSlotPromptBuilder {
 
-    /** HTML / MULTI_FILE 槽位段落的字符上限。 */
-    private static final int HTML_MULTI_BUDGET_CHARS = 1500;
+    /**
+     * HTML / MULTI_FILE 槽位段落的字符上限。
+     * <p>1500 字符在加入"营销页 6-8 区块丰富度清单"后会被卡裁，造成 layoutGuidance 在 trim 路径里丢失。
+     * 上调到 2200：实际首轮 prompt 仍远低于流式输入预算，TTFT 没有可观测影响。
+     */
+    private static final int HTML_MULTI_BUDGET_CHARS = 2200;
 
     private ImageSlotPromptBuilder() {
     }
