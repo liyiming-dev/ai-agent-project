@@ -53,6 +53,14 @@ public class ChatHistory implements Serializable {
     private Long appId;
 
     /**
+     * 会话id(雪花)。同 appId 下按 sessionId 切分多轮对话,
+     * 用户点"新对话"会刷新 app.currentSessionId,后续消息绑到新 session,
+     * loadChatHistoryToMemory 只加载匹配 currentSessionId 的历史,杜绝跨主题污染。
+     */
+    @Column("sessionId")
+    private Long sessionId;
+
+    /**
      * 创建用户id
      */
     @Column("userId")

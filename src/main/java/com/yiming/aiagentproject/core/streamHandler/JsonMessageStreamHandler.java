@@ -25,6 +25,7 @@ import reactor.core.scheduler.Schedulers;
 import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * JSON 消息流处理器
@@ -55,10 +56,13 @@ public class JsonMessageStreamHandler {
         StringBuilder chatHistoryStringBuilder = new StringBuilder();
         // 用于跟踪已经见过的工具ID，判断是否是第一次调用
         Set<String> seenToolIds = new HashSet<>();
+        // 标记当前是否打开了 tool args 的 ```json 代码围栏：
+        // 首次 TOOL_REQUEST 打开，TOOL_EXECUTED 关闭。中途 EXECUTED 缺失时由下一次 TOOL_REQUEST 自愈补关。
+        AtomicBoolean argsFenceOpen = new AtomicBoolean(false);
         return originFlux
                 .map(chunk -> {
                     // 解析每个 JSON 消息块
-                    return handleJsonMessageChunk(chunk, chatHistoryStringBuilder, seenToolIds);
+                    return handleJsonMessageChunk(chunk, chatHistoryStringBuilder, seenToolIds, argsFenceOpen);
                 })
                 .filter(StrUtil::isNotEmpty) // 过滤空字串
                 .concatWith(Flux.defer(() -> {
@@ -69,8 +73,11 @@ public class JsonMessageStreamHandler {
                     chatHistoryService.addChatMessage(appId, aiResponse, ChatHistoryMessageTypeEnum.AI.getValue(), loginUser.getId());
                     //异步构建 Vue项目
                     String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + File.separator + "vue_project_" + appId;
+                    // 流尾自愈：若上一个 tool args fence 未被 EXECUTED 关掉(异常/截断场景),
+                    // 先补一个闭合,避免后续"[构建 Vue 项目]..."文本被卷入 ```json 代码块
+                    String fenceClose = argsFenceOpen.getAndSet(false) ? "\n```\n" : "";
                     return Flux.concat(
-                            Flux.just("\n\n[构建 Vue 项目] 正在执行 npm install 和 npm run build，请稍候...\n\n"),
+                            Flux.just(fenceClose + "\n\n[构建 Vue 项目] 正在执行 npm install 和 npm run build，请稍候...\n\n"),
                             Mono.fromCallable(() -> vueProjectBuilder.buildProject(projectPath))
                                     .subscribeOn(Schedulers.boundedElastic())
                                     .map(success -> success
@@ -88,8 +95,16 @@ public class JsonMessageStreamHandler {
 
     /**
      * 解析并收集 TokenStream 数据
+     *
+     * <p>TOOL_REQUEST 分支历史上对同 toolId 的后续 chunk 一律返回空串，导致前端在工具参数流式期间长时间
+     * 黑屏（DeepSeek 写一个大文件时 args 流式可能持续 30s+）。现在把后续 partial args 透传给前端，
+     * 用 ```json 代码围栏包裹，让用户实时看到 tool 参数（即写入的文件内容）在增长。
+     * 聊天历史 builder 不收 args，避免污染 DB 历史，存储侧仍只保留 AI 文本和工具执行摘要。
      */
-    private String handleJsonMessageChunk(String chunk, StringBuilder chatHistoryStringBuilder, Set<String> seenToolIds) {
+    private String handleJsonMessageChunk(String chunk,
+                                          StringBuilder chatHistoryStringBuilder,
+                                          Set<String> seenToolIds,
+                                          AtomicBoolean argsFenceOpen) {
         // 解析 JSON
         StreamMessage streamMessage = JSONUtil.toBean(chunk, StreamMessage.class);
         StreamMessageTypeEnum typeEnum = StreamMessageTypeEnum.getEnumByValue(streamMessage.getType());
@@ -105,30 +120,34 @@ public class JsonMessageStreamHandler {
                 ToolRequestMessage toolRequestMessage = JSONUtil.toBean(chunk, ToolRequestMessage.class);
                 String toolId = toolRequestMessage.getId();
                 String toolName = toolRequestMessage.getName();
-                // 检查是否是第一次看到这个工具 ID
+                String partialArgs = StrUtil.nullToEmpty(toolRequestMessage.getArguments());
                 if (toolId != null && !seenToolIds.contains(toolId)) {
-                    // 第一次调用这个工具，记录 ID 并返回工具信息
                     seenToolIds.add(toolId);
-                    // 根据工具名称获取工具实例
                     BaseTool tool = toolManager.getTool(toolName);
-                    // 返回格式化的工具调用信息
-                    return tool.generateToolRequestResponse();
-                } else {
-                    // 不是第一次调用这个工具，直接返回空
-                    return "";
+                    StringBuilder out = new StringBuilder();
+                    // 防御：上一段 fence 没被 EXECUTED 关掉就先关，避免围栏嵌套
+                    if (argsFenceOpen.getAndSet(true)) {
+                        out.append("\n```\n");
+                    }
+                    out.append(tool.generateToolRequestResponse());
+                    out.append("```json\n");
+                    out.append(partialArgs);
+                    return out.toString();
                 }
+                // 同 toolId 后续 partial args 透传：让前端看到写入内容流式增长
+                return partialArgs;
             }
             case TOOL_EXECUTED -> {
                 ToolExecutedMessage toolExecutedMessage = JSONUtil.toBean(chunk, ToolExecutedMessage.class);
                 String toolName = toolExecutedMessage.getName();
                 JSONObject jsonObject = JSONUtil.parseObj(toolExecutedMessage.getArguments());
-                // 根据工具名称获取工具实例并生成相应的结果格式
                 BaseTool tool = toolManager.getTool(toolName);
                 String result = tool.generateToolExecutedResult(jsonObject);
-                // 输出前端和要持久化的内容
-                String output = String.format("\n\n%s\n\n", result);
-                chatHistoryStringBuilder.append(output);
-                return output;
+                String historyOutput = String.format("\n\n%s\n\n", result);
+                chatHistoryStringBuilder.append(historyOutput);
+                // 关闭 args 代码围栏（若已打开），再追加执行结果
+                String fenceClose = argsFenceOpen.getAndSet(false) ? "\n```\n" : "";
+                return fenceClose + historyOutput;
             }
             default -> {
                 log.error("不支持的消息类型: {}", typeEnum);

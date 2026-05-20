@@ -3,10 +3,12 @@ package com.yiming.aiagentproject.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.io.FileUtil;
+import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.spring.service.impl.ServiceImpl;
+import com.yiming.aiagentproject.ai.AiCodeGeneratorServiceFactory;
 import com.yiming.aiagentproject.ai.CodeGenTypeResolver;
 import com.yiming.aiagentproject.ai.guardrail.PromptSafetyInputGuardrail;
 import com.yiming.aiagentproject.ai.model.enums.ChatHistoryMessageTypeEnum;
@@ -68,6 +70,9 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
 
     @Resource
     private CodeGenTypeResolver codeGenTypeResolver;
+
+    @Resource
+    private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
     @Override
     public Long createApp(AppAddDto appAddDto, User loginUser) {
@@ -283,6 +288,29 @@ public class AppServiceImpl extends ServiceImpl<AppMapper, App> implements AppSe
         generateAppScreenshotAsync(appId, appDeployUrl);
         return appDeployUrl;
 
+    }
+
+    @Override
+    public Long startNewConversation(Long appId, User loginUser) {
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR, "用户未登录");
+        App app = this.getById(appId);
+        ThrowUtils.throwIf(app == null, ErrorCode.NOT_FOUND_ERROR, "应用不存在");
+        if (!app.getUserId().equals(loginUser.getId())) {
+            throw new BusinessException(ErrorCode.NO_AUTH_ERROR, "无权限操作该应用");
+        }
+        // 雪花 ID 与 KeyGenerators.snowFlakeId 同源,不会与现有 chat_history.sessionId 冲突
+        long newSessionId = IdUtil.getSnowflakeNextId();
+        App updateApp = new App();
+        updateApp.setId(appId);
+        updateApp.setCurrentSessionId(newSessionId);
+        boolean updated = this.updateById(updateApp);
+        ThrowUtils.throwIf(!updated, ErrorCode.OPERATION_ERROR, "刷新对话会话失败");
+        // 必须清缓存:旧 AiServices 实例持有的 ChatMemory 已经把旧 session 历史加载进了内存,
+        // 不清就会继续用脏 memory 跑新对话
+        aiCodeGeneratorServiceFactory.evictByAppId(appId);
+        log.info("应用开启新对话, appId={}, newSessionId={}", appId, newSessionId);
+        return newSessionId;
     }
 
     /**

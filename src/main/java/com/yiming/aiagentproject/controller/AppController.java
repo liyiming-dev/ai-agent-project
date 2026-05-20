@@ -303,6 +303,20 @@ public class AppController {
     }
 
     /**
+     * 开启新对话:刷新 app.currentSessionId 并清缓存,下一次 chatToGenCode 重新装载 ChatMemory
+     * 解决"换轨幻觉":同 appId 历史(可能是完全不同主题)被装入 prompt 导致 reasoning 模型在长生成中漂移
+     */
+    @PostMapping("/new-conversation")
+    public BaseResponse<Long> startNewConversation(@RequestBody AppNewConversationDto dto, HttpServletRequest request) {
+        ThrowUtils.throwIf(dto == null, ErrorCode.PARAMS_ERROR);
+        Long appId = dto.getAppId();
+        ThrowUtils.throwIf(appId == null || appId <= 0, ErrorCode.PARAMS_ERROR, "应用 ID 不能为空");
+        User loginUser = userService.getLoginUser(request);
+        Long newSessionId = appService.startNewConversation(appId, loginUser);
+        return ResultUtils.success(newSessionId);
+    }
+
+    /**
      * 应用部署
      *
      * @param appDeployDto 部署请求

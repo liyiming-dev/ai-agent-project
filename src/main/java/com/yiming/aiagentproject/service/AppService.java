@@ -40,4 +40,10 @@ public interface AppService extends IService<App> {
     String deployApp(Long appId, User loginUser);
 
     void generateAppScreenshotAsync(Long appId, String appUrl);
+
+    /**
+     * 新开一个对话会话:刷新 app.currentSessionId,清掉该 appId 的 AiCodeGeneratorService 缓存,
+     * 让下一次 chatToGenCode 重建 ChatMemory(走新 sessionId 过滤,即空历史)。
+     */
+    Long startNewConversation(Long appId, User loginUser);
 }

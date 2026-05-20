@@ -48,8 +48,13 @@ public class AiCodeGeneratorServiceFactory {
      * Vue 项目对话记忆使用的 token 预算。
      * 配合 {@link ThinkingTrimmingChatMemory} 剥离历史 reasoning_content 后，
      * 上限以"实际可见文本 + 工具调用 + 工具结果"计算，避免按消息条数计窗时单条 thinking 可能超几 k token。
+     *
+     * <p>2026-05-14 从 12000 收紧到 8000：Vue 单轮会写 20+ 文件，
+     * 每个 tool result 都会进 memory，越往后 prompt 越大，DeepSeek 服务端 prefill 时间线性上升，
+     * 表现为"越输出越慢/越卡"。8000 token 在保留当前轮工具链 + 1-2 轮历史摘要之间取平衡，
+     * 多轮迭代场景下 AI 会逐渐丢失更早的轮次记忆 — 对"完整重写"的 Vue 项目流影响有限。
      */
-    private static final int VUE_MEMORY_MAX_TOKENS = 12000;
+    private static final int VUE_MEMORY_MAX_TOKENS = 24000;
 
     /**
      * 用 OpenAI 的 cl100k_base 编码近似 DeepSeek 的分词。
@@ -152,6 +157,21 @@ public class AiCodeGeneratorServiceFactory {
         return appId + ":" + codeGenType.getValue();
     }
 
+    /**
+     * 把同一 appId 在缓存里的所有 AiCodeGeneratorService 实例剔除。
+     * 用在"新对话"按钮:刷新 currentSessionId 后,旧的 AiServices 持有的 ChatMemory 还指向旧 session 装载结果,
+     * 必须强制重建才会重新走 loadChatHistoryToMemory(按新 sessionId 过滤,空历史)。
+     *
+     * 兼容两种 key 形态:
+     *  - 新 key: "{appId}:{codeGenType}"
+     *  - 老 key: "{appId}"(早期重载 getAiCodeGeneratorService(appId) 用的)
+     */
+    public void evictByAppId(long appId) {
+        String prefix = appId + ":";
+        String legacyKey = String.valueOf(appId);
+        serviceCache.asMap().keySet().removeIf(key -> key.equals(legacyKey) || key.startsWith(prefix));
+        log.info("已清理 appId={} 的 AiCodeGeneratorService 缓存,下次调用将重建 ChatMemory", appId);
+    }
 
 }
 

@@ -56,13 +56,28 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         ChatHistoryMessageTypeEnum messageTypeEnum = ChatHistoryMessageTypeEnum.getEnumByValue(messageType);
         ThrowUtils.throwIf(messageTypeEnum == null, ErrorCode.PARAMS_ERROR, "不支持的消息类型: " + messageType);
         String safeMessage = truncateIfTooLong(message, appId);
+        // 读 app.currentSessionId 作为本条消息归属的 session;迁移期间老 app 已被回填为 appId
+        Long sessionId = resolveSessionId(appId);
         ChatHistory chatHistory = ChatHistory.builder()
                 .appId(appId)
+                .sessionId(sessionId)
                 .message(safeMessage)
                 .messageType(messageType)
                 .userId(userId)
                 .build();
         return this.save(chatHistory);
+    }
+
+    /**
+     * 读取 app 的当前 sessionId。null 兜底成 appId —— 与 P2.a 回填策略保持一致,
+     * 让漏迁移的边缘场景也能落到统一 session 而不是 NULL 主键(NOT NULL 列直接 INSERT 失败)。
+     */
+    private Long resolveSessionId(Long appId) {
+        App app = appMapper.selectOneById(appId);
+        if (app == null || app.getCurrentSessionId() == null) {
+            return appId;
+        }
+        return app.getCurrentSessionId();
     }
 
     private String truncateIfTooLong(String message, Long appId) {
@@ -148,6 +163,9 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
         queryRequest.setAppId(appId);
         queryRequest.setLastCreateTime(lastCreateTime);
         QueryWrapper queryWrapper = this.getQueryWrapper(queryRequest);
+        // 同 session 过滤:避免"新对话"按钮按下后,前端刷新还能看到上一个 session 的消息而 AI 又不记得,造成 UX 撕裂
+        Long sessionId = app.getCurrentSessionId() != null ? app.getCurrentSessionId() : appId;
+        queryWrapper.eq("sessionId", sessionId);
         // 查询数据
         return this.page(Page.of(1, pageSize), queryWrapper);
     }
@@ -162,9 +180,12 @@ public class ChatHistoryServiceImpl extends ServiceImpl<ChatHistoryMapper, ChatH
     @Override
     public int loadChatHistoryToMemory(Long appId, ChatMemory chatMemory, int maxCount) {
         try {
+            // 只加载当前 session 下的历史,避免上一个 session 的"绿碳科技"消息污染本轮"万璐菲博客"prompt
+            Long sessionId = resolveSessionId(appId);
             // 直接构造查询条件，起始点为 1 而不是 0，用于排除最新的用户消息
             QueryWrapper queryWrapper = QueryWrapper.create()
                     .eq(ChatHistory::getAppId, appId)
+                    .eq(ChatHistory::getSessionId, sessionId)
                     .orderBy(ChatHistory::getCreateTime, false)
                     .limit(1, maxCount);
             List<ChatHistory> historyList = this.list(queryWrapper);

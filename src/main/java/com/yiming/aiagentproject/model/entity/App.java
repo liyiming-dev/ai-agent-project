@@ -53,6 +53,13 @@ public class App implements Serializable {
     private String initPrompt;
 
     /**
+     * 当前会话id(雪花)。点击"新对话"按钮时刷新,新生成的 chat_history 都绑到这个 sessionId,
+     * 旧 sessionId 的历史依然留库但不再进 prompt。
+     */
+    @Column("currentSessionId")
+    private Long currentSessionId;
+
+    /**
      * 代码生成类型（枚举）
      */
     @Column("codeGenType")

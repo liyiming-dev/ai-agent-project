@@ -43,7 +43,7 @@ langchain4j:
     reasoning-streaming-chat-model:
       base-url: https://api.deepseek.com
       api-key: sk-5f831bd2b3bd43c7942eb71867da7e6b
-      model-name: deepseek-v4-pro
+      model-name: deepseek-v4-flash
       # Vue 项目带 reasoning + tool calls，输出预算适当大一些
       max-tokens: 64000
       log-requests: false

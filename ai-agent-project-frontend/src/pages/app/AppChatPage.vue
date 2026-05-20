@@ -5,7 +5,13 @@ import { message, Modal } from 'ant-design-vue'
 import MarkdownIt from 'markdown-it'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/atom-one-dark.css'
-import { deleteApp, deployApp, downloadAppCode, getAppVoById } from '@/api/api/appController'
+import {
+  deleteApp,
+  deployApp,
+  downloadAppCode,
+  getAppVoById,
+  startNewConversation,
+} from '@/api/api/appController'
 import { listAppChatHistory } from '@/api/api/chatHistoryController'
 import { useLoginUserStore } from '@/stores/loginUser'
 import { buildSelectedElementPrompt, useVisualEditor } from '@/utils/visualEditor'
@@ -64,6 +70,7 @@ const inputMessage = ref('')
 const sending = ref(false)
 const deploying = ref(false)
 const downloading = ref(false)
+const startingNewConversation = ref(false)
 const previewReady = ref(false)
 const previewVersion = ref(0)
 const initialSent = ref(false)
@@ -179,6 +186,7 @@ const resetPageState = () => {
   sending.value = false
   deploying.value = false
   downloading.value = false
+  startingNewConversation.value = false
   previewReady.value = false
   previewVersion.value = 0
   initialSent.value = false
@@ -520,6 +528,41 @@ const openDetail = () => {
   detailVisible.value = true
 }
 
+const handleStartNewConversation = () => {
+  if (!appId.value || isPendingApp.value) return
+  if (sending.value) {
+    message.warning('AI 正在回复,等当前生成结束再新开对话')
+    return
+  }
+  Modal.confirm({
+    title: '开启新对话?',
+    content: '当前对话历史会保留在数据库,但不会再进入 AI 上下文。已生成的预览站点不受影响。',
+    okText: '开启',
+    cancelText: '取消',
+    onOk: async () => {
+      startingNewConversation.value = true
+      try {
+        const res = await startNewConversation({ appId: appId.value as unknown as number })
+        if (res.data.code === 0 && res.data.data) {
+          // 本地状态重置:清空对话列表 + 分页游标 + 禁掉 initPrompt 自动重发
+          messages.value = []
+          totalHistoryCount.value = 0
+          oldestCreateTime.value = undefined
+          hasMoreHistory.value = false
+          initialSent.value = true
+          message.success('新对话已开启')
+          return
+        }
+        message.error(res.data.message ?? '开启新对话失败')
+      } catch {
+        message.error('开启新对话失败')
+      } finally {
+        startingNewConversation.value = false
+      }
+    },
+  })
+}
+
 const handleEditApp = () => {
   if (!app.value?.id) return
   detailVisible.value = false
@@ -616,6 +659,15 @@ onBeforeUnmount(() => {
       </div>
       <a-space :size="10">
         <a-button :disabled="isPendingApp || !app" @click="openDetail">应用详情</a-button>
+        <a-tooltip title="开启新对话,清空 AI 上下文(历史保留在库里不丢)" placement="bottom">
+          <a-button
+            :loading="startingNewConversation"
+            :disabled="isPendingApp || !isOwner || sending"
+            @click="handleStartNewConversation"
+          >
+            新对话
+          </a-button>
+        </a-tooltip>
         <a-button
           :loading="downloading"
           :disabled="isPendingApp || !isOwner"
